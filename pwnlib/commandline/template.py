@@ -1,43 +1,48 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import annotations
+
+from mako.lookup import Template, TemplateLookup
 
 from pwn import *
 from pwnlib.commandline import common
-from pwnlib.util.misc import which, parse_ldd_output, write
-
-from sys import stderr
-from mako.lookup import TemplateLookup, Template
+from pwnlib.util.misc import parse_ldd_output, which, write
 
 parser = common.parser_commands.add_parser(
-    'template',
-    help = 'Generate an exploit template',
-    description = 'Generate an exploit template. If no arguments are given, '
-                    'the current directory is searched for an executable binary and ' 
-                    'libc. If only one binary is found, it is assumed to be the '
-                    'challenge binary.'
+    "template",
+    help="Generate an exploit template",
+    description="Generate an exploit template. If no arguments are given, "
+    "the current directory is searched for an executable binary and "
+    "libc. If only one binary is found, it is assumed to be the "
+    "challenge binary.",
 )
 
 # change path to hardcoded one when building the documentation
-printable_data_path = "pwnlib/data" if 'sphinx' in sys.modules else pwnlib.data.path
+printable_data_path = "pwnlib/data" if "sphinx" in sys.modules else pwnlib.data.path
 
-parser.add_argument('exe', nargs='?', help='Target binary. If not given, the current directory is searched for an executable binary.')
-parser.add_argument('--host', help='Remote host / SSH server')
-parser.add_argument('--port', help='Remote port / SSH port', type=int)
-parser.add_argument('--user', help='SSH Username')
-parser.add_argument('--pass', '--password', help='SSH Password', dest='password')
-parser.add_argument('--libc', help='Path to libc binary to use. If not given, the current directory is searched for a libc binary.')
-parser.add_argument('--path', help='Remote path of file on SSH server')
-parser.add_argument('--quiet', help='Less verbose template comments', action='store_true')
-parser.add_argument('--color', help='Print the output in color', choices=['never', 'always', 'auto'], default='auto')
-parser.add_argument('--template', help='Path to a custom template. Tries to use \'~/.config/pwntools/templates/pwnup.mako\', if it exists. '
-                                   'Check \'%s\' for the default template shipped with pwntools.' % 
-                                        os.path.join(printable_data_path, "templates", "pwnup.mako"))
-parser.add_argument('--no-auto', help='Do not automatically detect missing binaries', action='store_false', dest='auto')
+parser.add_argument(
+    "exe", nargs="?", help="Target binary. If not given, the current directory is searched for an executable binary."
+)
+parser.add_argument("--host", help="Remote host / SSH server")
+parser.add_argument("--port", help="Remote port / SSH port", type=int)
+parser.add_argument("--user", help="SSH Username")
+parser.add_argument("--pass", "--password", help="SSH Password", dest="password")
+parser.add_argument(
+    "--libc", help="Path to libc binary to use. If not given, the current directory is searched for a libc binary."
+)
+parser.add_argument("--path", help="Remote path of file on SSH server")
+parser.add_argument("--quiet", help="Less verbose template comments", action="store_true")
+parser.add_argument("--color", help="Print the output in color", choices=["never", "always", "auto"], default="auto")
+parser.add_argument(
+    "--template",
+    help="Path to a custom template. Tries to use '~/.config/pwntools/templates/pwnup.mako', if it exists. "
+    "Check '%s' for the default template shipped with pwntools."
+    % os.path.join(printable_data_path, "templates", "pwnup.mako"),
+)
+parser.add_argument("--no-auto", help="Do not automatically detect missing binaries", action="store_false", dest="auto")
+
 
 def get_docker_image_libraries():
     """Tries to retrieve challenge libraries from a Docker image built from the Dockerfile in the current working directory.
-    
+
     The libraries are retrieved by parsing the output of running ldd on /bin/sh.
     Supports regular Docker images as well as jail images.
     """
@@ -49,7 +54,7 @@ def get_docker_image_libraries():
         jail_image_to_chroot_dir = {
             "pwn.red/jail": "/srv",
         }
-        dockerfile = open("Dockerfile", "r").read()
+        dockerfile = open("Dockerfile").read()
         jail = None
         chroot_dir = "/"
         for jail_image in jail_image_to_chroot_dir:
@@ -59,23 +64,31 @@ def get_docker_image_libraries():
                 break
         try:
             progress.status("Building image")
-            image_sha = subprocess.check_output(["docker", "build", "-q", "."], stderr=subprocess.PIPE, shell=False).decode().strip()
+            image_sha = (
+                subprocess.check_output(["docker", "build", "-q", "."], stderr=subprocess.PIPE, shell=False)
+                .decode()
+                .strip()
+            )
 
             progress.status("Retrieving library paths")
             ldd_command = ["-c", "chroot %s /bin/sh -c 'ldd /bin/sh'" % chroot_dir]
-            ldd_output = subprocess.check_output([
+            ldd_output = subprocess.check_output(
+                [
                     "docker",
                     "run",
                     "--rm",
                     "--entrypoint",
                     "/bin/sh",
-                    ] + (["--privileged"] if jail else []) + [
-                        image_sha,
-                    ] + ldd_command,
-                stderr=subprocess.PIPE, 
-                shell=False
+                ]
+                + (["--privileged"] if jail else [])
+                + [
+                    image_sha,
+                ]
+                + ldd_command,
+                stderr=subprocess.PIPE,
+                shell=False,
             ).decode()
-            
+
             libc, ld = None, None
             libc_basename, ld_basename = None, None
             for lib_path in parse_ldd_output(ldd_output):
@@ -93,17 +106,19 @@ def get_docker_image_libraries():
             progress.status("Copying libraries to current directory")
             for filename, basename in zip((libc, ld), (libc_basename, ld_basename)):
                 cat_command = ["-c", "chroot %s /bin/sh -c '/bin/cat %s'" % (chroot_dir, filename)]
-                contents = subprocess.check_output([
+                contents = subprocess.check_output(
+                    [
                         "docker",
                         "run",
                         "--rm",
                         "--entrypoint",
                         "/bin/sh",
-                        ] + (["--privileged"] if jail else []) + [
-                            image_sha
-                        ] + cat_command,
-                    stderr=subprocess.PIPE, 
-                    shell=False
+                    ]
+                    + (["--privileged"] if jail else [])
+                    + [image_sha]
+                    + cat_command,
+                    stderr=subprocess.PIPE,
+                    shell=False,
                 )
                 write(basename, contents)
 
@@ -115,16 +130,17 @@ def get_docker_image_libraries():
         progress.success("Retrieved libraries from Docker image")
     return libc_basename, ld_basename
 
+
 def detect_missing_binaries(args):
     """Automatically detects challenge binaries and libraries in the current directory.
-    
+
     This function scans the current directory for executable files, libc, and ld libraries.
     If a Dockerfile is present and no libraries are found, it attempts to extract them from
     the Docker image, but only if the binary is not statically linked.
-    
+
     Args:
         args: Argument namespace containing exe and libc attributes.
-        
+
     Returns:
         tuple: A pair of (executable_path, libc_path) where either may be None if not found.
     """
@@ -136,21 +152,22 @@ def detect_missing_binaries(args):
     for filename in os.listdir("."):
         if not os.path.isfile(filename):
             continue
-        if not libc and ('libc-' in filename or 'libc.' in filename):
+        if not libc and ("libc-" in filename or "libc." in filename):
             libc = filename
-        elif not ld and 'ld-' in filename:
+        elif not ld and "ld-" in filename:
             ld = filename
         elif filename == "Dockerfile":
             has_dockerfile = True
-        else:
-            if os.access(filename, os.X_OK):
-                other_files.append(filename)
+        elif os.access(filename, os.X_OK):
+            other_files.append(filename)
     if not exe:
         if len(other_files) == 1:
             exe = other_files[0]
         elif len(other_files) > 1:
-            log.warning("Failed to find challenge binary. There are multiple binaries in the current directory: %s", other_files)
-    
+            log.warning(
+                "Failed to find challenge binary. There are multiple binaries in the current directory: %s", other_files
+            )
+
     # Check if the binary is statically linked before trying to extract libraries from Docker
     is_statically_linked = False
     if exe:
@@ -161,9 +178,9 @@ def detect_missing_binaries(args):
                 log.info("Binary is statically linked, no need for external libraries")
         except Exception as e:
             log.warning("Could not check if binary is statically linked: %s", e)
-    
+
     # Only extract libraries from Docker if the binary is not statically linked
-    if has_dockerfile and exe and not (libc or ld) and not is_statically_linked: 
+    if has_dockerfile and exe and not (libc or ld) and not is_statically_linked:
         libc, ld = get_docker_image_libraries()
 
     if exe != args.exe:
@@ -172,14 +189,11 @@ def detect_missing_binaries(args):
         log.success("Found libc binary %r", libc)
     return exe, libc
 
-def main(args):
 
+def main(args):
     lookup = TemplateLookup(
-        directories      = [
-            os.path.expanduser('~/.config/pwntools/templates/'),
-            os.path.join(pwnlib.data.path, 'templates')
-        ],
-        module_directory = None
+        directories=[os.path.expanduser("~/.config/pwntools/templates/"), os.path.join(pwnlib.data.path, "templates")],
+        module_directory=None,
     )
 
     # For the SSH scenario, check that the binary is at the
@@ -202,38 +216,34 @@ def main(args):
 
     if args.auto and (args.exe is None or args.libc is None):
         args.exe, args.libc = detect_missing_binaries(args)
-    
+
     if args.template:
-        template = Template(filename=args.template) # Failing on invalid file is ok
+        template = Template(filename=args.template)  # Failing on invalid file is ok
     else:
-        template = lookup.get_template('pwnup.mako')
-    
-    output = template.render(args.exe,
-                             args.host,
-                             args.port,
-                             args.user,
-                             args.password,
-                             args.libc,
-                             args.path,
-                             args.quiet)
+        template = lookup.get_template("pwnup.mako")
+
+    output = template.render(args.exe, args.host, args.port, args.user, args.password, args.libc, args.path, args.quiet)
 
     # Fix Mako formatting bs
-    output = re.sub('\n\n\n', '\n\n', output)
+    output = re.sub("\n\n\n", "\n\n", output)
 
     # Colorize the output if it's a TTY
-    if args.color == 'always' or (args.color == 'auto' and sys.stdout.isatty()):
+    if args.color == "always" or (args.color == "auto" and sys.stdout.isatty()):
         from pygments import highlight
         from pygments.formatters import TerminalFormatter
         from pygments.lexers.python import PythonLexer
+
         output = highlight(output, PythonLexer(), TerminalFormatter())
 
     print(output)
 
     # If redirected to a file, make the resulting script executable
     if not sys.stdout.isatty():
-        try: os.fchmod(sys.stdout.fileno(), 0o700)
-        except OSError: pass
+        try:
+            os.fchmod(sys.stdout.fileno(), 0o700)
+        except OSError:
+            pass
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     pwnlib.commandline.common.main(__file__, main)
-    

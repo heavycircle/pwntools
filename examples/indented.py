@@ -13,13 +13,14 @@ and
 
 Also notice that `pause()` can react on any key when in `term_mode`.
 """
+from __future__ import annotations
 
 from pwn import *
 
-context.log_level = 'info'
+context.log_level = "info"
 
-log.indented('A' * 100)
-log.indented('B' * 100)
-log.indented('C' * 100)
+log.indented("A" * 100)
+log.indented("B" * 100)
+log.indented("C" * 100)
 
 pause()

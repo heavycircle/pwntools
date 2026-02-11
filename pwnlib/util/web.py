@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import os
 import tempfile
@@ -10,6 +8,7 @@ from pwnlib.tubes.buffer import Buffer
 from pwnlib.util.misc import size
 
 log = getLogger(__name__)
+
 
 def wget(url, save=None, timeout=5, **kwargs):
     r"""wget(url, save=None, timeout=5) -> str
@@ -45,25 +44,25 @@ def wget(url, save=None, timeout=5, **kwargs):
             w.failure("Got code %s" % response.status_code)
             return
 
-        total_size = int(response.headers.get('content-length',0))
+        total_size = int(response.headers.get("content-length", 0))
 
-        w.status('0 / %s' % size(total_size))
+        w.status("0 / %s" % size(total_size))
 
         # Find out the next largest size we can represent as
         chunk_size = 1
-        while chunk_size < (total_size/10):
+        while chunk_size < (total_size / 10):
             chunk_size *= 1000
 
         # Count chunks as they're received
         buf = Buffer()
 
         # Loop until we have all of the data
-        for chunk in response.iter_content(chunk_size = 2**10):
+        for chunk in response.iter_content(chunk_size=2**10):
             buf.add(chunk)
             if total_size:
-                w.status('%s / %s' % (size(buf.size), size(total_size)))
+                w.status("%s / %s" % (size(buf.size), size(total_size)))
             else:
-                w.status('%s' % size(buf.size))
+                w.status("%s" % size(buf.size))
 
         total_data = buf.get()
 
@@ -71,11 +70,11 @@ def wget(url, save=None, timeout=5, **kwargs):
         if save:
             if not isinstance(save, (bytes, str)):
                 save = os.path.basename(url)
-                save = save or tempfile.NamedTemporaryFile(dir='.', delete=False).name
-            with open(save,'wb+') as f:
+                save = save or tempfile.NamedTemporaryFile(dir=".", delete=False).name
+            with open(save, "wb+") as f:
                 f.write(total_data)
-                w.success('Saved %r (%s)' % (f.name, size(total_data)))
+                w.success("Saved %r (%s)" % (f.name, size(total_data)))
         else:
-            w.success('%s' % size(total_data))
+            w.success("%s" % size(total_data))
 
         return total_data

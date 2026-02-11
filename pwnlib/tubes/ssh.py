@@ -1,5 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import logging
 import os
@@ -13,28 +12,24 @@ import threading
 import time
 
 from pwnlib import term
-from pwnlib.context import context, LocalContext
+from pwnlib.context import LocalContext, context
 from pwnlib.exception import PwnlibException
 from pwnlib.log import Logger
-from pwnlib.log import getLogger
 from pwnlib.term import text
 from pwnlib.timeout import Timeout
 from pwnlib.tubes.sock import sock
-from pwnlib.util import hashes
-from pwnlib.util import misc
-from pwnlib.util import packing
-from pwnlib.util import safeeval
+from pwnlib.util import hashes, misc, packing, safeeval
 from pwnlib.util.sh_string import sh_string
 
 # Kill the warning line:
 # No handlers could be found for logger "paramiko.transport"
 paramiko_log = logging.getLogger("paramiko.transport")
-h = logging.StreamHandler(open(os.devnull,'w+'))
+h = logging.StreamHandler(open(os.devnull, "w+"))
 h.setFormatter(logging.Formatter())
 paramiko_log.addHandler(h)
 
-class ssh_channel(sock):
 
+class ssh_channel(sock):
     #: Parent :class:`ssh` object
     parent = None
 
@@ -55,7 +50,7 @@ class ssh_channel(sock):
     #: Command specified for the constructor
     process = None
 
-    def __init__(self, parent, process = None, tty = False, cwd = None, env = None, raw = True, *args, **kwargs):
+    def __init__(self, parent, process=None, tty=False, cwd=None, env=None, raw=True, *args, **kwargs):
         super(ssh_channel, self).__init__(*args, **kwargs)
 
         # keep the parent from being garbage collected in some cases
@@ -63,55 +58,55 @@ class ssh_channel(sock):
 
         self.returncode = None
         self.host = parent.host
-        self.tty  = tty
-        self.env  = env
+        self.tty = tty
+        self.env = env
         self.process = process
-        self.cwd  = cwd or '.'
+        self.cwd = cwd or "."
         if isinstance(cwd, str):
             cwd = packing._need_bytes(cwd, 2, 0x80)
 
         env = env or {}
-        msg = 'Opening new channel: %r' % (process or 'shell')
+        msg = "Opening new channel: %r" % (process or "shell")
 
         if isinstance(process, (list, tuple)):
-            process = b' '.join(sh_string(packing._need_bytes(s, 2, 0x80)) for s in process)
+            process = b" ".join(sh_string(packing._need_bytes(s, 2, 0x80)) for s in process)
         if isinstance(process, str):
             process = packing._need_bytes(process, 2, 0x80)
 
         if process and cwd:
-            process = b'cd ' + sh_string(cwd) + b' >/dev/null 2>&1; ' + process
+            process = b"cd " + sh_string(cwd) + b" >/dev/null 2>&1; " + process
 
         if process and env:
             for name, value in env.items():
                 nameb = packing._need_bytes(name, 2, 0x80)
-                if not re.match(b'^[a-zA-Z_][a-zA-Z0-9_]*$', nameb):
-                    self.error('run(): Invalid environment key %r' % name)
-                export = b'export %s=%s;' % (nameb, sh_string(packing._need_bytes(value, 2, 0x80)))
+                if not re.match(b"^[a-zA-Z_][a-zA-Z0-9_]*$", nameb):
+                    self.error("run(): Invalid environment key %r" % name)
+                export = b"export %s=%s;" % (nameb, sh_string(packing._need_bytes(value, 2, 0x80)))
                 process = export + process
 
         if process and tty:
             if raw:
-                process = b'stty raw -ctlecho -echo; ' + process
+                process = b"stty raw -ctlecho -echo; " + process
             else:
-                process = b'stty -ctlecho -echo; ' + process
-
+                process = b"stty -ctlecho -echo; " + process
 
         # If this object is enabled for DEBUG-level logging, don't hide
         # anything about the command that's actually executed.
         if process and self.isEnabledFor(logging.DEBUG):
-            msg = 'Opening new channel: %r' % ((process,) or 'shell')
+            msg = "Opening new channel: %r" % ((process,) or "shell")
 
         with self.waitfor(msg) as h:
             import paramiko
+
             try:
                 self.sock = parent.transport.open_session()
             except paramiko.ChannelException as e:
-                if e.args == (1, 'Administratively prohibited'):
+                if e.args == (1, "Administratively prohibited"):
                     self.error("Too many sessions open! Use ssh_channel.close() or 'with'!")
                 raise e
 
             if self.tty:
-                self.sock.get_pty('xterm', term.width, term.height)
+                self.sock.get_pty("xterm", term.width, term.height)
 
                 def resizer():
                     if self.sock:
@@ -146,7 +141,7 @@ class ssh_channel(sock):
 
         self.close()
 
-    def recvall(self, timeout = sock.forever):
+    def recvall(self, timeout=sock.forever):
         # We subclass tubes.sock which sets self.sock to None.
         #
         # However, we need to wait for the return value to propagate,
@@ -180,8 +175,7 @@ class ssh_channel(sock):
         process has not yet finished and the exit code otherwise.
         """
 
-        if self.returncode is None and self.sock \
-        and (block or self.sock.exit_status_ready()):
+        if self.returncode is None and self.sock and (block or self.sock.exit_status_ready()):
             while not self.sock.status_event.is_set():
                 self.sock.status_event.wait(0.05)
             self.returncode = self.sock.recv_exit_status()
@@ -196,7 +190,7 @@ class ssh_channel(sock):
                 time.sleep(min(self.timeout, 0.05))
         return False
 
-    def interactive(self, prompt = term.text.bold_red('$') + ' '):
+    def interactive(self, prompt=term.text.bold_red("$") + " "):
         """interactive(prompt = pwnlib.term.text.bold_red('$') + ' ')
 
         If not in TTY-mode, this does exactly the same as
@@ -216,34 +210,35 @@ class ssh_channel(sock):
         if self.process is not None:
             return super(ssh_channel, self).interactive(prompt)
 
-        self.info('Switching to interactive mode')
+        self.info("Switching to interactive mode")
 
         # We would like a cursor, please!
         term.term.show_cursor()
 
         event = threading.Event()
+
         def recv_thread(event):
             while not event.is_set():
                 try:
-                    cur = self.recv(timeout = 0.05)
-                    cur = cur.replace(b'\r\n',b'\n')
-                    cur = cur.replace(b'\r',b'')
+                    cur = self.recv(timeout=0.05)
+                    cur = cur.replace(b"\r\n", b"\n")
+                    cur = cur.replace(b"\r", b"")
                     if cur is None:
                         continue
-                    elif cur == b'\a':
+                    elif cur == b"\a":
                         # Ugly hack until term unstands bell characters
                         continue
                     stdout = sys.stdout
                     if not term.term_mode:
-                        stdout = getattr(stdout, 'buffer', stdout)
+                        stdout = getattr(stdout, "buffer", stdout)
                     stdout.write(cur)
                     stdout.flush()
                 except EOFError:
-                    self.info('Got EOF while reading in interactive')
+                    self.info("Got EOF while reading in interactive")
                     event.set()
                     break
 
-        t = context.Thread(target = recv_thread, args = (event,))
+        t = context.Thread(target=recv_thread, args=(event,))
         t.daemon = True
         t.start()
 
@@ -252,12 +247,12 @@ class ssh_channel(sock):
                 try:
                     data = term.key.getraw(0.1)
                 except KeyboardInterrupt:
-                    data = [3] # This is ctrl-c
-                except IOError:
+                    data = [3]  # This is ctrl-c
+                except OSError:
                     if not event.is_set():
                         raise
             else:
-                stdin = getattr(sys.stdin, 'buffer', sys.stdin)
+                stdin = getattr(sys.stdin, "buffer", sys.stdin)
                 data = stdin.read(1)
                 if not data:
                     event.set()
@@ -269,10 +264,10 @@ class ssh_channel(sock):
                     self.send(bytes(bytearray(data)))
                 except EOFError:
                     event.set()
-                    self.info('Got EOF while sending in interactive')
+                    self.info("Got EOF while sending in interactive")
 
         while t.is_alive():
-            t.join(timeout = 0.1)
+            t.join(timeout=0.1)
 
         # Restore
         term.term.hide_cursor()
@@ -284,10 +279,11 @@ class ssh_channel(sock):
         super(ssh_channel, self).close()
 
     def spawn_process(self, *args, **kwargs):
-        self.error("Cannot use spawn_process on an SSH channel.""")
+        self.error("Cannot use spawn_process on an SSH channel.")
 
     def _close_msg(self):
-        self.info('Closed SSH channel with %s' % self.host)
+        self.info("Closed SSH channel with %s" % self.host)
+
 
 class ssh_process(ssh_channel):
     #: Working directory
@@ -317,18 +313,17 @@ class ssh_process(ssh_channel):
         """
         maps = self.parent.libs(self.executable)
 
-        maps_raw = self.parent.cat('/proc/%d/maps' % self.pid).decode()
+        maps_raw = self.parent.cat("/proc/%d/maps" % self.pid).decode()
 
         for lib in maps:
             remote_path = lib.split(self.parent.host)[-1]
-            remote_path = self.parent.readlink('-f', remote_path).decode()
+            remote_path = self.parent.readlink("-f", remote_path).decode()
             for line in maps_raw.splitlines():
                 if line.endswith(remote_path):
-                    address = line.split('-')[0]
+                    address = line.split("-")[0]
                     maps[lib] = int(address, 16)
                     break
         return maps
-
 
     @property
     def libc(self):
@@ -348,7 +343,7 @@ class ssh_process(ssh_channel):
         from pwnlib.elf import ELF
 
         for lib, address in self.libs().items():
-            if 'libc.so' in lib:
+            if "libc.so" in lib:
                 e = ELF(lib)
                 e.address = address
                 return e
@@ -367,7 +362,6 @@ class ssh_process(ssh_channel):
             # Cannot just check "executable in lib", see issue #1047
             if lib.endswith(self.executable):
                 return pwnlib.elf.elf.ELF(lib)
-
 
     @property
     def corefile(self):
@@ -393,25 +387,26 @@ class ssh_process(ssh_channel):
 
         variable = bytearray(packing._need_bytes(variable, min_wrong=0x80))
 
-        script = ';'.join(('from ctypes import *',
-                           'import os',
-                           'libc = CDLL("libc.so.6")',
-                           'getenv = libc.getenv',
-                           'getenv.restype = c_void_p',
-                           'print(os.path.realpath(%r))' % self.executable,
-                           'print(getenv(bytes(%r)))' % variable,))
+        script = ";".join(
+            (
+                "from ctypes import *",
+                "import os",
+                'libc = CDLL("libc.so.6")',
+                "getenv = libc.getenv",
+                "getenv.restype = c_void_p",
+                "print(os.path.realpath(%r))" % self.executable,
+                "print(getenv(bytes(%r)))" % variable,
+            )
+        )
 
         try:
             with context.quiet:
-                python = self.parent.which('python2.7') or self.parent.which('python3') or self.parent.which('python')
+                python = self.parent.which("python2.7") or self.parent.which("python3") or self.parent.which("python")
 
                 if not python:
                     self.error("Python is not installed on the remote system.")
 
-                io = self.parent.process([argv0,'-c', script.strip()],
-                                          executable=python,
-                                          env=self.env,
-                                          **kwargs)
+                io = self.parent.process([argv0, "-c", script.strip()], executable=python, env=self.env, **kwargs)
                 path = io.recvline()
                 address = int(io.recvall())
 
@@ -427,10 +422,7 @@ class ssh_process(ssh_channel):
         if self.executable is None:
             return super(ssh_process, self)._close_msg()
 
-        self.info('Stopped remote process %r on %s (pid %i)' \
-            % (os.path.basename(self.executable),
-               self.host,
-               self.pid))
+        self.info("Stopped remote process %r on %s (pid %i)" % (os.path.basename(self.executable), self.host, self.pid))
 
 
 class ssh_connecter(sock):
@@ -443,33 +435,36 @@ class ssh_connecter(sock):
         # keep reference to tunnel process to avoid garbage collection
         self.tunnel = None
 
-        self.host  = parent.host
+        self.host = parent.host
         self.rhost = host
         self.rport = port
 
         import paramiko.ssh_exception
-        msg = 'Connecting to %s:%d via SSH to %s' % (self.rhost, self.rport, self.host)
+
+        msg = "Connecting to %s:%d via SSH to %s" % (self.rhost, self.rport, self.host)
         with self.waitfor(msg) as h:
             try:
-                self.sock = parent.transport.open_channel('direct-tcpip', (host, port), ('127.0.0.1', 0))
+                self.sock = parent.transport.open_channel("direct-tcpip", (host, port), ("127.0.0.1", 0))
             except paramiko.ssh_exception.ChannelException as e:
                 # Workaround AllowTcpForwarding no in sshd_config
-                if e.args != (1, 'Administratively prohibited'):
+                if e.args != (1, "Administratively prohibited"):
                     self.exception(str(e))
                     raise e
-                
-                self.debug('Failed to open channel, trying to connect to remote port manually using netcat or bash.')
-                ncats = ['nc', 'ncat', 'netcat']
+
+                self.debug("Failed to open channel, trying to connect to remote port manually using netcat or bash.")
+                ncats = ["nc", "ncat", "netcat"]
                 cmd = []
                 for ncat in ncats:
                     if parent.which(ncat):
                         cmd = [ncat, host, str(port)]
                         break
                 else:
-                    if parent.which('bash'):
-                        cmd = ['bash', '-c', 'exec 3<>/dev/tcp/{}/{}; cat <&3 & cat >&3; kill $!'.format(host, port)]
+                    if parent.which("bash"):
+                        cmd = ["bash", "-c", f"exec 3<>/dev/tcp/{host}/{port}; cat <&3 & cat >&3; kill $!"]
                     else:
-                        self.exception('Could not find nc, ncat, netcat, or bash on remote. Cannot connect to remote port.')
+                        self.exception(
+                            "Could not find nc, ncat, netcat, or bash on remote. Cannot connect to remote port."
+                        )
                         raise
                 self.tunnel = parent.process(cmd)
                 self.sock = self.tunnel.sock
@@ -493,7 +488,7 @@ class ssh_connecter(sock):
             h.success()
 
     def spawn_process(self, *args, **kwargs):
-        self.error("Cannot use spawn_process on an SSH channel.""")
+        self.error("Cannot use spawn_process on an SSH channel.")
 
     def _close_msg(self):
         self.info("Closed remote connection to %s:%d via SSH connection to %s" % (self.rhost, self.rport, self.host))
@@ -512,33 +507,36 @@ class ssh_listener(sock):
             self.port = parent.transport.request_port_forward(bind_address, port)
 
         except Exception:
-            h.failure('Failed create a port forwarding')
+            h.failure("Failed create a port forwarding")
             raise
 
         def accepter():
-            msg = 'Waiting on port %d via SSH to %s' % (self.port, self.host)
-            h   = self.waitfor(msg)
+            msg = "Waiting on port %d via SSH to %s" % (self.port, self.host)
+            h = self.waitfor(msg)
             try:
                 self.sock = parent.transport.accept()
                 parent.transport.cancel_port_forward(bind_address, self.port)
             except Exception:
                 self.sock = None
                 h.failure()
-                self.exception('Failed to get a connection')
+                self.exception("Failed to get a connection")
                 return
 
             self.rhost, self.rport = self.sock.origin_addr
-            h.success('Got connection from %s:%d' % (self.rhost, self.rport))
+            h.success("Got connection from %s:%d" % (self.rhost, self.rport))
 
-        self._accepter = context.Thread(target = accepter)
+        self._accepter = context.Thread(target=accepter)
         self._accepter.daemon = True
         self._accepter.start()
 
     def _close_msg(self):
-        self.info("Closed remote connection to %s:%d via SSH listener on port %d via %s" % (self.rhost, self.rport, self.port, self.host))
+        self.info(
+            "Closed remote connection to %s:%d via SSH listener on port %d via %s"
+            % (self.rhost, self.rport, self.port, self.host)
+        )
 
     def spawn_process(self, *args, **kwargs):
-        self.error("Cannot use spawn_process on an SSH channel.""")
+        self.error("Cannot use spawn_process on an SSH channel.")
 
     def wait_for_connection(self):
         """Blocks until a connection has been established."""
@@ -548,20 +546,19 @@ class ssh_listener(sock):
     @property
     def sock(self):
         try:
-            return self.__dict__['sock']
+            return self.__dict__["sock"]
         except KeyError:
             pass
         while self._accepter.is_alive():
             self._accepter.join(timeout=0.1)
-        return self.__dict__.get('sock')
+        return self.__dict__.get("sock")
 
     @sock.setter
     def sock(self, s):
-        self.__dict__['sock'] = s
+        self.__dict__["sock"] = s
 
 
 class ssh(Timeout, Logger):
-
     #: Remote host name (``str``)
     host = None
 
@@ -592,13 +589,29 @@ class ssh(Timeout, Logger):
     #: PID of the remote ``sshd`` process servicing this connection.
     pid = None
 
-    _cwd = '.'
+    _cwd = "."
     _tried_sftp = False
 
-    def __init__(self, user=None, host=None, port=22, password=None, key=None,
-                 keyfile=None, proxy_command=None, proxy_sock=None, level=None,
-                 cache=True, ssh_agent=False, ignore_config=False, raw=False, 
-                 auth_none=False, disabled_algorithms=None, *a, **kw):
+    def __init__(
+        self,
+        user=None,
+        host=None,
+        port=22,
+        password=None,
+        key=None,
+        keyfile=None,
+        proxy_command=None,
+        proxy_sock=None,
+        level=None,
+        cache=True,
+        ssh_agent=False,
+        ignore_config=False,
+        raw=False,
+        auth_none=False,
+        disabled_algorithms=None,
+        *a,
+        **kw,
+    ):
         """Creates a new ssh connection.
 
         Arguments:
@@ -641,16 +654,15 @@ class ssh(Timeout, Logger):
         if level is not None:
             self.setLevel(level)
 
-
-        self.host            = host
-        self.port            = port
-        self.user            = user
-        self.password        = password
-        self.key             = key
-        self.keyfile         = keyfile
-        self._cachedir       = os.path.join(tempfile.gettempdir(), 'pwntools-ssh-cache')
-        self.cache           = cache
-        self.raw             = raw
+        self.host = host
+        self.port = port
+        self.user = user
+        self.password = password
+        self.key = key
+        self.keyfile = keyfile
+        self._cachedir = os.path.join(tempfile.gettempdir(), "pwntools-ssh-cache")
+        self.cache = cache
+        self.raw = raw
 
         # Deferred attributes
         self._platform_info = {}
@@ -666,42 +678,42 @@ class ssh(Timeout, Logger):
 
         # Make a basic attempt to parse the ssh_config file
         try:
-            config_file = os.path.expanduser('~/.ssh/config')
+            config_file = os.path.expanduser("~/.ssh/config")
 
             if not ignore_config and os.path.exists(config_file):
-                ssh_config  = paramiko.SSHConfig()
+                ssh_config = paramiko.SSHConfig()
                 ssh_config.parse(open(config_file))
                 host_config = ssh_config.lookup(host)
-                if 'hostname' in host_config:
-                    self.host = host = host_config['hostname']
-                if not user and 'user' in host_config:
-                    self.user = user = host_config['user']
-                if not keyfile and 'identityfile' in host_config:
-                    keyfile = host_config['identityfile'][0]
-                    if keyfile.lower() == 'none':
+                if "hostname" in host_config:
+                    self.host = host = host_config["hostname"]
+                if not user and "user" in host_config:
+                    self.user = user = host_config["user"]
+                if not keyfile and "identityfile" in host_config:
+                    keyfile = host_config["identityfile"][0]
+                    if keyfile.lower() == "none":
                         keyfile = None
         except Exception as e:
             self.debug("An error occurred while parsing ~/.ssh/config:\n%s" % e)
 
         keyfiles = [os.path.expanduser(keyfile)] if keyfile else []
 
-        msg = 'Connecting to %s on port %d' % (host, port)
+        msg = "Connecting to %s on port %d" % (host, port)
         with self.waitfor(msg) as h:
             self.client = paramiko.SSHClient()
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
             if not ignore_config:
-                known_hosts = os.path.expanduser('~/.ssh/known_hosts')
+                known_hosts = os.path.expanduser("~/.ssh/known_hosts")
                 if os.path.exists(known_hosts):
                     self.client.load_host_keys(known_hosts)
 
             has_proxy = bool(proxy_sock or proxy_command)
             if has_proxy:
-                if 'ProxyCommand' not in dir(paramiko):
-                    self.error('This version of paramiko does not support proxies.')
+                if "ProxyCommand" not in dir(paramiko):
+                    self.error("This version of paramiko does not support proxies.")
 
                 if proxy_sock and proxy_command:
-                    self.error('Cannot have both a proxy command and a proxy sock')
+                    self.error("Cannot have both a proxy command and a proxy sock")
 
                 if proxy_command:
                     proxy_sock = paramiko.ProxyCommand(proxy_command)
@@ -709,12 +721,27 @@ class ssh(Timeout, Logger):
                 proxy_sock = None
 
             try:
-                self.client.connect(host, port, user, password, key, keyfiles, self.timeout, allow_agent=ssh_agent, compress=True, sock=proxy_sock, look_for_keys=not ignore_config, disabled_algorithms=disabled_algorithms)
-            except paramiko.BadHostKeyException as e:
-                self.error("Remote host %(host)s is using a different key than stated in known_hosts\n"
-                           "    To remove the existing entry from your known_hosts and trust the new key, run the following commands:\n"
-                           "        $ ssh-keygen -R %(host)s\n"
-                           "        $ ssh-keygen -R [%(host)s]:%(port)s" % locals())
+                self.client.connect(
+                    host,
+                    port,
+                    user,
+                    password,
+                    key,
+                    keyfiles,
+                    self.timeout,
+                    allow_agent=ssh_agent,
+                    compress=True,
+                    sock=proxy_sock,
+                    look_for_keys=not ignore_config,
+                    disabled_algorithms=disabled_algorithms,
+                )
+            except paramiko.BadHostKeyException:
+                self.error(
+                    "Remote host %(host)s is using a different key than stated in known_hosts\n"
+                    "    To remove the existing entry from your known_hosts and trust the new key, run the following commands:\n"
+                    "        $ ssh-keygen -R %(host)s\n"
+                    "        $ ssh-keygen -R [%(host)s]:%(port)s" % locals()
+                )
             except paramiko.SSHException as e:
                 if user and auth_none and str(e) == "No authentication methods available":
                     self.client.get_transport().auth_none(user)
@@ -735,13 +762,15 @@ class ssh(Timeout, Logger):
             with context.quiet:
                 self.cwd = packing._decode(self.pwd(tty=False))
         else:
-            self.cwd = '.'
+            self.cwd = "."
 
-        with context.local(log_level='error'):
+        with context.local(log_level="error"):
+
             def getppid():
                 print(os.getppid())
+
             try:
-                self.pid = int(self.process('false', preexec_fn=getppid).recvall())
+                self.pid = int(self.process("false", preexec_fn=getppid).recvall())
             except Exception:
                 self.pid = None
 
@@ -751,7 +780,7 @@ class ssh(Timeout, Logger):
             self.warn_once("Couldn't check security settings on %r" % self.host)
 
     def __repr__(self):
-        return "{}(user={!r}, host={!r})".format(self.__class__.__name__, self.user, self.host)
+        return f"{self.__class__.__name__}(user={self.user!r}, host={self.host!r})"
 
     @property
     def cwd(self):
@@ -788,7 +817,7 @@ class ssh(Timeout, Logger):
     def __exit__(self, *a, **kw):
         self.close()
 
-    def shell(self, shell = None, tty = True, timeout = Timeout.default):
+    def shell(self, shell=None, tty=True, timeout=Timeout.default):
         """shell(shell = None, tty = True, timeout = Timeout.default) -> ssh_channel
 
         Open a new channel with a shell inside.
@@ -809,11 +838,28 @@ class ssh(Timeout, Logger):
             >>> print(b'Hello' in sh.recvall())
             True
         """
-        return self.run(shell, tty, timeout = timeout)
+        return self.run(shell, tty, timeout=timeout)
 
-    def process(self, argv=None, executable=None, tty=True, cwd=None, env=None, ignore_environ=None, timeout=Timeout.default, run=True,
-                stdin=0, stdout=1, stderr=2, preexec_fn=None, preexec_args=(), raw=True, aslr=None, setuid=None,
-                shell=False):
+    def process(
+        self,
+        argv=None,
+        executable=None,
+        tty=True,
+        cwd=None,
+        env=None,
+        ignore_environ=None,
+        timeout=Timeout.default,
+        run=True,
+        stdin=0,
+        stdout=1,
+        stderr=2,
+        preexec_fn=None,
+        preexec_args=(),
+        raw=True,
+        aslr=None,
+        setuid=None,
+        shell=False,
+    ):
         r"""
         Executes a process on the remote server, in the same fashion
         as pwnlib.tubes.process.process.
@@ -958,18 +1004,29 @@ class ssh(Timeout, Logger):
 
         """
         cwd = cwd or self.cwd
-        script = misc._create_execve_script(argv=argv, executable=executable,
-                cwd=cwd, env=env, stdin=stdin, stdout=stdout, stderr=stderr,
-                ignore_environ=ignore_environ, preexec_fn=preexec_fn, preexec_args=preexec_args,
-                aslr=aslr, setuid=setuid, shell=shell, log=self)
-
+        script = misc._create_execve_script(
+            argv=argv,
+            executable=executable,
+            cwd=cwd,
+            env=env,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            ignore_environ=ignore_environ,
+            preexec_fn=preexec_fn,
+            preexec_args=preexec_args,
+            aslr=aslr,
+            setuid=setuid,
+            shell=shell,
+            log=self,
+        )
 
         self.debug("Created execve script:\n" + script)
 
         if not run:
-            with context.local(log_level='error'):
-                tmpfile = self.mktemp('-t', 'pwnlib-execve-XXXXXXXXXX')
-                self.chmod('+x', tmpfile)
+            with context.local(log_level="error"):
+                tmpfile = self.mktemp("-t", "pwnlib-execve-XXXXXXXXXX")
+                self.chmod("+x", tmpfile)
 
             self.info("Uploading execve script to %r" % tmpfile)
             script = packing._encode(script)
@@ -978,36 +1035,42 @@ class ssh(Timeout, Logger):
 
         executable = executable or argv[0]
         if self.isEnabledFor(logging.DEBUG):
-            execve_repr = "execve(%r, %s, %s)" % (executable,
-                                                  argv,
-                                                  'os.environ'
-                                                  if (env in (None, getattr(os, "environb", os.environ))) 
-                                                  else env)
+            execve_repr = "execve(%r, %s, %s)" % (
+                executable,
+                argv,
+                "os.environ" if (env in (None, getattr(os, "environb", os.environ))) else env,
+            )
             # Avoid spamming the screen
             if self.isEnabledFor(logging.DEBUG) and len(execve_repr) > 512:
-                execve_repr = execve_repr[:512] + '...'
+                execve_repr = execve_repr[:512] + "..."
         else:
             execve_repr = repr(executable)
 
-        msg = 'Starting remote process %s on %s' % (execve_repr, self.host)
+        msg = "Starting remote process %s on %s" % (execve_repr, self.host)
 
         if timeout == Timeout.default:
             timeout = self.timeout
 
         with self.progress(msg) as h:
-
-            script = 'echo PWNTOOLS; for py in python3 python2.7 python2 python; do test -x "$(command -v $py 2>&1)" && echo $py && exec $py -c %s check; done; echo 2' % sh_string(script)
+            script = (
+                'echo PWNTOOLS; for py in python3 python2.7 python2 python; do test -x "$(command -v $py 2>&1)" && echo $py && exec $py -c %s check; done; echo 2'
+                % sh_string(script)
+            )
             with context.quiet:
                 python = ssh_process(self, script, tty=True, cwd=cwd, raw=True, level=self.level, timeout=timeout)
 
             try:
-                python.recvline_contains(b'PWNTOOLS')   # Magic flag so that any sh/bash initialization errors are swallowed
+                python.recvline_contains(
+                    b"PWNTOOLS"
+                )  # Magic flag so that any sh/bash initialization errors are swallowed
                 try:
-                    if b'python' not in python.recvline():  # Python interpreter that was selected
+                    if b"python" not in python.recvline():  # Python interpreter that was selected
                         raise ValueError("Python not found on remote host")
                 except (EOFError, ValueError):
-                    self.warn_once('Could not find a Python interpreter on %s\n' % self.host
-                                   + "Use ssh.system() instead of ssh.process()\n")
+                    self.warn_once(
+                        "Could not find a Python interpreter on %s\n" % self.host
+                        + "Use ssh.system() instead of ssh.process()\n"
+                    )
                     h.failure("Process creation failed")
                     return None
 
@@ -1030,15 +1093,15 @@ class ssh(Timeout, Logger):
             elif result != 1:
                 h.failure("something bad happened:\n%s" % error_message)
 
-            python.pid  = safeeval.const(python.recvline())
-            python.uid  = safeeval.const(python.recvline())
-            python.gid  = safeeval.const(python.recvline())
+            python.pid = safeeval.const(python.recvline())
+            python.uid = safeeval.const(python.recvline())
+            python.gid = safeeval.const(python.recvline())
             python.suid = safeeval.const(python.recvline())
             python.sgid = safeeval.const(python.recvline())
             python.argv = argv
-            python.executable = packing._decode(python.recvuntil(b'\x00')[:-1])
+            python.executable = packing._decode(python.recvuntil(b"\x00")[:-1])
 
-            h.success('pid %i' % python.pid)
+            h.success("pid %i" % python.pid)
 
         if not aslr and setuid and (python.uid != python.suid or python.gid != python.sgid):
             effect = "partial" if self.aslr_ulimit else "no"
@@ -1067,14 +1130,14 @@ class ssh(Timeout, Logger):
 
         program = packing._encode(program)
 
-        result = self.system(b'export PATH=$PATH:$PWD; command -v ' + program).recvall().strip()
+        result = self.system(b"export PATH=$PATH:$PWD; command -v " + program).recvall().strip()
 
-        if (b'/' + program) not in result:
+        if (b"/" + program) not in result:
             return None
 
         return packing._decode(result)
 
-    def system(self, process, tty = True, cwd = None, env = None, timeout = None, raw = True, wd = None):
+    def system(self, process, tty=True, cwd=None, env=None, timeout=None, raw=True, wd=None):
         r"""system(process, tty = True, cwd = None, env = None, timeout = Timeout.default, raw = True) -> ssh_channel
 
         Open a new channel with a specific process inside. If `tty` is True,
@@ -1112,7 +1175,7 @@ class ssh(Timeout, Logger):
         if timeout is None:
             timeout = self.timeout
 
-        return ssh_channel(self, process, tty, cwd, env, timeout = timeout, level = self.level, raw = raw)
+        return ssh_channel(self, process, tty, cwd, env, timeout=timeout, level=self.level, raw=raw)
 
     #: Backward compatibility.  Use :meth:`system`
     run = system
@@ -1128,17 +1191,20 @@ class ssh(Timeout, Logger):
             the path is *exactly* the same, it is recommended to invoke the
             process with ``argv=[]``.
         """
-        script = '''
+        script = (
+            """
 from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
-''' % variable
+"""
+            % variable
+        )
 
-        with context.local(log_level='error'):
-            python = self.which('python') or self.which('python2.7') or self.which('python3')
+        with context.local(log_level="error"):
+            python = self.which("python") or self.which("python2.7") or self.which("python3")
 
             if not python:
                 self.error("Python is not installed on the remote system.")
 
-            io = self.process(['','-c', script.strip()], executable=python, **kwargs)
+            io = self.process(["", "-c", script.strip()], executable=python, **kwargs)
             result = io.recvall()
 
         try:
@@ -1146,9 +1212,7 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         except ValueError:
             self.exception("Could not look up environment variable %r" % variable)
 
-
-
-    def run_to_end(self, process, tty = False, cwd = None, env = None, wd = None):
+    def run_to_end(self, process, tty=False, cwd=None, env=None, wd=None):
         r"""run_to_end(process, tty = False, cwd = None, env = None, timeout = Timeout.default) -> str
 
         Run a command on the remote server and return a tuple with
@@ -1160,21 +1224,21 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             >>> s =  ssh(host='example.pwnme')
             >>> print(s.run_to_end('echo Hello; exit 17'))
             (b'Hello\n', 17)
-            """
+        """
 
         if wd is not None:
             self.warning_once("The 'wd' argument to ssh.run_to_end() is deprecated.  Use 'cwd' instead.")
             if cwd is None:
                 cwd = wd
 
-        with context.local(log_level = 'ERROR'):
-            c = self.system(process, tty, cwd = cwd, env = env, timeout = Timeout.default)
+        with context.local(log_level="ERROR"):
+            c = self.system(process, tty, cwd=cwd, env=env, timeout=Timeout.default)
             data = c.recvall()
             retcode = c.wait()
             c.close()
             return data, retcode
 
-    def connect_remote(self, host, port, timeout = Timeout.default):
+    def connect_remote(self, host, port, timeout=Timeout.default):
         r"""connect_remote(host, port, timeout = Timeout.default) -> ssh_connecter
 
         Connects to a host through an SSH connection. This is equivalent to
@@ -1198,7 +1262,7 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
 
     remote = connect_remote
 
-    def listen_remote(self, port = 0, bind_address = '', timeout = Timeout.default):
+    def listen_remote(self, port=0, bind_address="", timeout=Timeout.default):
         r"""listen_remote(port = 0, bind_address = '', timeout = Timeout.default) -> ssh_connecter
 
         Listens remotely through an SSH connection. This is equivalent to
@@ -1262,12 +1326,10 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             b'value: the env'
         """
         bad_attrs = [
-            'trait_names',          # ipython tab-complete
+            "trait_names",  # ipython tab-complete
         ]
 
-        if attr in self.__dict__ \
-        or attr in bad_attrs \
-        or attr.startswith('_'):
+        if attr in self.__dict__ or attr in bad_attrs or attr.startswith("_"):
             raise AttributeError
 
         @LocalContext
@@ -1278,9 +1340,10 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             else:
                 command = [attr]
                 command.extend(args)
-                command = b' '.join(packing._need_bytes(arg, min_wrong=0x80) for arg in command)
+                command = b" ".join(packing._need_bytes(arg, min_wrong=0x80) for arg in command)
 
             return self.system(command, **kwargs).recvall().strip()
+
         return runner
 
     def connected(self):
@@ -1307,25 +1370,27 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
     def _libs_remote(self, remote):
         """Return a dictionary of the libraries used by a remote file."""
         escaped_remote = sh_string(remote)
-        cmd = ''.join([
-            '(',
-            'ulimit -s unlimited;',
-            'ldd %s > /dev/null &&' % escaped_remote,
-            '(',
-            'LD_TRACE_LOADED_OBJECTS=1 %s||' % escaped_remote,
-            'ldd %s' % escaped_remote,
-            '))',
-            ' 2>/dev/null'
-        ])
+        cmd = "".join(
+            [
+                "(",
+                "ulimit -s unlimited;",
+                "ldd %s > /dev/null &&" % escaped_remote,
+                "(",
+                "LD_TRACE_LOADED_OBJECTS=1 %s||" % escaped_remote,
+                "ldd %s" % escaped_remote,
+                "))",
+                " 2>/dev/null",
+            ]
+        )
         data, status = self.run_to_end(cmd)
         if status != 0:
-            self.error('Unable to find libraries for %r' % remote)
+            self.error("Unable to find libraries for %r" % remote)
             return {}
 
         return misc.parse_ldd_output(packing._decode(data))
 
     def _get_fingerprint(self, remote):
-        cmd = '(sha256 || sha256sum || openssl sha256) 2>/dev/null < '
+        cmd = "(sha256 || sha256sum || openssl sha256) 2>/dev/null < "
         cmd = cmd + sh_string(remote)
 
         data, status = self.run_to_end(cmd)
@@ -1334,18 +1399,17 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             return None
 
         if not isinstance(data, str):
-            data = data.decode('ascii')
+            data = data.decode("ascii")
 
-        data = re.search("([a-fA-F0-9]{64})",data).group()
+        data = re.search("([a-fA-F0-9]{64})", data).group()
         return data
 
     def _get_cachefile(self, fingerprint):
         return os.path.join(self._cachedir, fingerprint)
 
     def _verify_local_fingerprint(self, fingerprint):
-        if not set(fingerprint).issubset(string.hexdigits) or \
-           len(fingerprint) != 64:
-            self.error('Invalid fingerprint %r' % fingerprint)
+        if not set(fingerprint).issubset(string.hexdigits) or len(fingerprint) != 64:
+            self.error("Invalid fingerprint %r" % fingerprint)
             return False
 
         local = self._get_cachefile(fingerprint)
@@ -1366,10 +1430,10 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             try:
                 self.sftp.get(remote, local, update)
                 return
-            except IOError:
+            except OSError:
                 pass
 
-        cmd = 'wc -c < ' + sh_string(remote)
+        cmd = "wc -c < " + sh_string(remote)
         total, exitcode = self.run_to_end(cmd)
 
         if exitcode != 0:
@@ -1378,10 +1442,10 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
 
         total = int(total)
 
-        with context.local(log_level = 'ERROR'):
-            cmd = 'cat < ' + sh_string(remote)
+        with context.local(log_level="ERROR"):
+            cmd = "cat < " + sh_string(remote)
             c = self.system(cmd)
-        data = b''
+        data = b""
 
         while True:
             try:
@@ -1396,24 +1460,23 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             self.warn_once("Could not verify success of file download %r, no error code" % (remote))
 
         if result != 0 and result != -1:
-            h.failure('Could not download file %r (%r)' % (remote, result))
+            h.failure("Could not download file %r (%r)" % (remote, result))
             return
 
-        with open(local, 'wb') as fd:
+        with open(local, "wb") as fd:
             fd.write(data)
 
     def _download_to_cache(self, remote, p, fingerprint=True):
-
-        with context.local(log_level='error'):
-            remote = self.readlink('-f', remote, tty=False)
-        if not hasattr(remote, 'encode'):
-            remote = remote.decode('utf-8')
+        with context.local(log_level="error"):
+            remote = self.readlink("-f", remote, tty=False)
+        if not hasattr(remote, "encode"):
+            remote = remote.decode("utf-8")
 
         fingerprint = fingerprint and self._get_fingerprint(remote) or None
         if fingerprint is None:
             local = os.path.normpath(remote)
             local = os.path.basename(local)
-            local += time.strftime('-%Y-%m-%d-%H:%M:%S')
+            local += time.strftime("-%Y-%m-%d-%H:%M:%S")
             local = os.path.join(self._cachedir, local)
 
             self._download_raw(remote, local, p)
@@ -1422,12 +1485,12 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         local = self._get_cachefile(fingerprint)
 
         if self.cache and self._verify_local_fingerprint(fingerprint):
-            p.success('Found %r in ssh cache' % remote)
+            p.success("Found %r in ssh cache" % remote)
         else:
             self._download_raw(remote, local, p)
 
             if not self._verify_local_fingerprint(fingerprint):
-                self.error('Could not download file %r', remote)
+                self.error("Could not download file %r", remote)
 
         return local
 
@@ -1452,11 +1515,11 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             b'Hello, world'
 
         """
-        with self.progress('Downloading %r' % remote) as p:
-            with open(self._download_to_cache(remote, p, fingerprint), 'rb') as fd:
+        with self.progress("Downloading %r" % remote) as p:
+            with open(self._download_to_cache(remote, p, fingerprint), "rb") as fd:
                 return fd.read()
 
-    def download_file(self, remote, local = None):
+    def download_file(self, remote, local=None):
         """Downloads a file from the remote server.
 
         The file is cached in /tmp/pwntools-ssh-cache using a hash of the file, so
@@ -1465,7 +1528,7 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         Arguments:
             remote(str/bytes): The remote filename to download
             local(str): The local filename to save it to. Default is to infer it from the remote filename.
-        
+
         Examples:
 
             >>> with open('/tmp/foobar','w+') as f:
@@ -1479,11 +1542,10 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             Hello, world
         """
 
-
         if not local:
             local = os.path.basename(os.path.normpath(remote))
 
-        with self.progress('Downloading %r to %r' % (remote, local)) as p:
+        with self.progress("Downloading %r to %r" % (remote, local)) as p:
             local_tmp = self._download_to_cache(remote, p)
 
         # Check to see if an identical copy of the file already exists
@@ -1502,10 +1564,10 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         if self.sftp:
             remote = packing._encode(self.sftp.normalize(remote))
         else:
-            with context.local(log_level='error'):
-                remote = self.system(b'readlink -f ' + sh_string(remote)).recvall().strip()
+            with context.local(log_level="error"):
+                remote = self.system(b"readlink -f " + sh_string(remote)).recvall().strip()
 
-        local = local or '.'
+        local = local or "."
         local = os.path.expanduser(local)
 
         self.info("Downloading %r to %r" % (remote, local))
@@ -1514,28 +1576,24 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             opts = b" --ignore-failed-read"
         else:
             opts = b""
-        with context.local(log_level='error'):
+        with context.local(log_level="error"):
             remote_tar = self.mktemp()
-            cmd = b'tar %s -C %s -czf %s .' % \
-                  (opts,
-                   sh_string(remote),
-                   sh_string(remote_tar))
+            cmd = b"tar %s -C %s -czf %s ." % (opts, sh_string(remote), sh_string(remote_tar))
             tar = self.system(cmd)
 
             if 0 != tar.wait():
                 self.error("Could not create remote tar")
 
-            local_tar = tempfile.NamedTemporaryFile(suffix='.tar.gz')
+            local_tar = tempfile.NamedTemporaryFile(suffix=".tar.gz")
             self.download_file(remote_tar, local_tar.name)
 
             # Delete temporary tarfile from remote host
             if self.sftp:
                 self.unlink(remote_tar)
             else:
-                self.system(b'rm ' + sh_string(remote_tar)).wait()
+                self.system(b"rm " + sh_string(remote_tar)).wait()
             tar = tarfile.open(local_tar.name)
             tar.extractall(local)
-
 
     def upload_data(self, data, remote):
         """Uploads some data into a file on the remote server.
@@ -1568,12 +1626,12 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
                 self.sftp.put(f.name, remote)
                 return
 
-        with context.local(log_level = 'ERROR'):
-            cmd = 'cat > ' + sh_string(remote)
+        with context.local(log_level="ERROR"):
+            cmd = "cat > " + sh_string(remote)
             s = self.system(cmd, tty=False)
             s.send(data)
-            s.shutdown('send')
-            data   = s.recvall()
+            s.shutdown("send")
+            data = s.recvall()
             result = s.wait()
 
             if result == -1:
@@ -1582,23 +1640,22 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             if result != 0 and result != -1:
                 self.error("Could not upload file %r (%r)\n%s" % (remote, result, data))
 
-    def upload_file(self, filename, remote = None):
+    def upload_file(self, filename, remote=None):
         """Uploads a file to the remote server. Returns the remote filename.
 
         Arguments:
         filename(str): The local filename to download
         remote(str): The remote filename to save it to. Default is to infer it from the local filename."""
 
-
         if remote is None:
             remote = os.path.normpath(filename)
             remote = os.path.basename(remote)
             remote = os.path.join(self.cwd, remote)
 
-        with open(filename, 'rb') as fd:
+        with open(filename, "rb") as fd:
             data = fd.read()
 
-        self.info("Uploading %r to %r" % (filename,remote))
+        self.info("Uploading %r to %r" % (filename, remote))
         self.upload_data(data, remote)
 
         return remote
@@ -1611,28 +1668,28 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             remote: Remote directory
         """
 
-        remote    = packing._encode(remote or self.cwd)
+        remote = packing._encode(remote or self.cwd)
 
-        local     = os.path.expanduser(local)
-        dirname   = os.path.dirname(local)
-        basename  = os.path.basename(local)
+        local = os.path.expanduser(local)
+        dirname = os.path.dirname(local)
+        basename = os.path.basename(local)
 
         if not os.path.isdir(local):
             self.error("%r is not a directory" % local)
 
-        msg = "Uploading %r to %r" % (basename,remote)
+        msg = "Uploading %r to %r" % (basename, remote)
         with self.waitfor(msg):
             # Generate a tarfile with everything inside of it
-            local_tar  = tempfile.mktemp()
-            with tarfile.open(local_tar, 'w:gz') as tar:
+            local_tar = tempfile.mktemp()
+            with tarfile.open(local_tar, "w:gz") as tar:
                 tar.add(local, basename)
 
             # Upload and extract it
-            with context.local(log_level='error'):
-                remote_tar = self.mktemp('--suffix=.tar.gz')
+            with context.local(log_level="error"):
+                remote_tar = self.mktemp("--suffix=.tar.gz")
                 self.upload_file(local_tar, remote_tar)
 
-                untar = self.system(b'cd %s && tar -xzf %s' % (sh_string(remote), sh_string(remote_tar)))
+                untar = self.system(b"cd %s && tar -xzf %s" % (sh_string(remote), sh_string(remote_tar)))
                 message = untar.recvrepeat(2)
 
                 if untar.wait() != 0:
@@ -1658,7 +1715,7 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         if os.path.isdir(file_or_directory):
             return self.upload_dir(file_or_directory, remote)
 
-        self.error('%r does not exist' % file_or_directory)
+        self.error("%r does not exist" % file_or_directory)
 
     def download(self, file_or_directory, local=None):
         """download(file_or_directory, local=None)
@@ -1669,7 +1726,7 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             file_or_directory(str): Path to the file or directory to download.
             local(str): Local path to store the data.
                 By default, uses the current directory.
-        
+
 
         Examples:
 
@@ -1684,7 +1741,7 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             Hello, world
         """
         file_or_directory = packing._encode(file_or_directory)
-        with self.system(b'test -d ' + sh_string(file_or_directory)) as io:
+        with self.system(b"test -d " + sh_string(file_or_directory)) as io:
             is_dir = io.wait()
 
         if 0 == is_dir:
@@ -1708,7 +1765,7 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
 
         return self.sftp.unlink(file)
 
-    def libs(self, remote, directory = None, flatten = False):
+    def libs(self, remote, directory=None, flatten=False):
         """Downloads the libraries referred to by a file.
 
         This is done by running ldd on the remote server, parsing the output
@@ -1727,7 +1784,7 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
 
         libs = self._libs_remote(remote)
 
-        remote = packing._decode(self.readlink('-f',remote).strip())
+        remote = packing._decode(self.readlink("-f", remote).strip())
         libs[remote] = 0
 
         if flatten:
@@ -1738,9 +1795,8 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
                 name = os.path.basename(lib)
 
                 if name in basenames.values():
-                    duplicate = [key for key, value in basenames.items() if
-                                 value == name][0]
-                    self.error('Duplicate lib name: %r / %4r' % (lib, duplicate))
+                    duplicate = [key for key, value in basenames.items() if value == name][0]
+                    self.error("Duplicate lib name: %r / %4r" % (lib, duplicate))
 
                 basenames[lib] = name
 
@@ -1754,10 +1810,9 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         seen = set()
 
         for lib, addr in libs.items():
-            local = os.path.realpath(os.path.join(directory, '.' + os.path.sep \
-                    + (basenames[lib] if flatten else lib)))
+            local = os.path.realpath(os.path.join(directory, "." + os.path.sep + (basenames[lib] if flatten else lib)))
             if not local.startswith(directory):
-                self.warning('This seems fishy: %r' % lib)
+                self.warning("This seems fishy: %r" % lib)
                 continue
 
             misc.mkdir_p(os.path.dirname(local))
@@ -1778,14 +1833,14 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
 
         s = self.shell(shell)
 
-        if self.cwd != '.':
-            cmd = 'cd ' + sh_string(self.cwd)
+        if self.cwd != ".":
+            cmd = "cd " + sh_string(self.cwd)
             s.sendline(packing._need_bytes(cmd, 2, 0x80))
 
         s.interactive()
         s.close()
 
-    def set_working_directory(self, wd = None, symlink = False):
+    def set_working_directory(self, wd=None, symlink=False):
         """Sets the working directory in which future commands will
         be run (via ssh.run) and to which files will be uploaded/downloaded
         from if no path is provided
@@ -1850,35 +1905,35 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         status = 0
 
         if symlink and not isinstance(symlink, (bytes, str)):
-            symlink = os.path.join(self.pwd(), b'*')
-        if not hasattr(symlink, 'encode') and hasattr(symlink, 'decode'):
-            symlink = symlink.decode('utf-8')
-            
+            symlink = os.path.join(self.pwd(), b"*")
+        if not hasattr(symlink, "encode") and hasattr(symlink, "decode"):
+            symlink = symlink.decode("utf-8")
+
         if isinstance(wd, str):
             wd = packing._need_bytes(wd, 2, 0x80)
 
         if not wd:
-            wd, status = self.run_to_end('x=$(mktemp -d) && cd $x && chmod +x . && echo $PWD', cwd='.')
+            wd, status = self.run_to_end("x=$(mktemp -d) && cd $x && chmod +x . && echo $PWD", cwd=".")
             wd = wd.strip()
 
             if status:
                 self.error("Could not generate a temporary directory (%i)\n%s" % (status, wd))
 
         else:
-            cmd = b'ls ' + sh_string(wd)
-            _, status = self.run_to_end(cmd, wd = '.')
+            cmd = b"ls " + sh_string(wd)
+            _, status = self.run_to_end(cmd, wd=".")
 
             if status:
                 self.error("%r does not appear to exist" % wd)
 
         if not isinstance(wd, str):
-            wd = wd.decode('utf-8')
+            wd = wd.decode("utf-8")
         self.cwd = wd
 
         self.info("Working directory: %r" % self.cwd)
 
         if symlink:
-            self.ln('-s', symlink, '.')
+            self.ln("-s", symlink, ".")
 
         return wd
 
@@ -1910,29 +1965,29 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
 
         def preexec():
             import platform
-            print('\n'.join(platform.uname()))
+
+            print("\n".join(platform.uname()))
 
         with context.quiet:
-            with self.process('true', preexec_fn=preexec) as io:
-
+            with self.process("true", preexec_fn=preexec) as io:
                 self._platform_info = {
-                    'system': io.recvline().lower().strip().decode(),
-                    'node': io.recvline().lower().strip().decode(),
-                    'release': io.recvline().lower().strip().decode(),
-                    'version': io.recvline().lower().strip().decode(),
-                    'machine': io.recvline().lower().strip().decode(),
-                    'processor': io.recvline().lower().strip().decode(),
-                    'distro': 'Unknown',
-                    'distro_ver': ''
+                    "system": io.recvline().lower().strip().decode(),
+                    "node": io.recvline().lower().strip().decode(),
+                    "release": io.recvline().lower().strip().decode(),
+                    "version": io.recvline().lower().strip().decode(),
+                    "machine": io.recvline().lower().strip().decode(),
+                    "processor": io.recvline().lower().strip().decode(),
+                    "distro": "Unknown",
+                    "distro_ver": "",
                 }
 
             try:
-                if not self.which('lsb_release'):
+                if not self.which("lsb_release"):
                     return
 
-                with self.process(['lsb_release', '-irs']) as io:
+                with self.process(["lsb_release", "-irs"]) as io:
                     lsb_info = io.recvall().strip().decode()
-                    self._platform_info['distro'], self._platform_info['distro_ver'] = lsb_info.split()
+                    self._platform_info["distro"], self._platform_info["distro_ver"] = lsb_info.split()
             except Exception:
                 pass
 
@@ -1941,18 +1996,17 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         """:class:`str`: Operating System of the remote machine."""
         try:
             self._init_remote_platform_info()
-            with context.local(os=self._platform_info['system']):
+            with context.local(os=self._platform_info["system"]):
                 return context.os
         except Exception:
             return "Unknown"
-
 
     @property
     def arch(self):
         """:class:`str`: CPU Architecture of the remote machine."""
         try:
             self._init_remote_platform_info()
-            with context.local(arch=self._platform_info['machine']):
+            with context.local(arch=self._platform_info["machine"]):
                 return context.arch
         except Exception:
             return "Unknown"
@@ -1973,23 +2027,23 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         """:class:`tuple`: Kernel version of the remote machine."""
         try:
             self._init_remote_platform_info()
-            vers = self._platform_info['release']
+            vers = self._platform_info["release"]
 
             # 3.11.0-12-generic
-            expr = r'([0-9]+\.?)+'
+            expr = r"([0-9]+\.?)+"
 
             vers = re.search(expr, vers).group()
-            return tuple(map(int, vers.split('.')))
+            return tuple(map(int, vers.split(".")))
 
         except Exception:
-            return (0,0,0)
+            return (0, 0, 0)
 
     @property
     def distro(self):
         """:class:`tuple`: Linux distribution name and release."""
         try:
             self._init_remote_platform_info()
-            return (self._platform_info['distro'], self._platform_info['distro_ver'])
+            return (self._platform_info["distro"], self._platform_info["distro_ver"])
         except Exception:
             return ("Unknown", "Unknown")
 
@@ -2004,15 +2058,15 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             True
         """
         if self._aslr is None:
-            if self.os != 'linux':
+            if self.os != "linux":
                 self.warn_once("Only Linux is supported for ASLR checks.")
                 self._aslr = False
 
             else:
                 with context.quiet:
-                    rvs = self.read('/proc/sys/kernel/randomize_va_space')
+                    rvs = self.read("/proc/sys/kernel/randomize_va_space")
 
-                self._aslr = not rvs.startswith(b'0')
+                self._aslr = not rvs.startswith(b"0")
 
         return self._aslr
 
@@ -2026,16 +2080,12 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             return self._aslr_ulimit
 
         # This test must run a 32-bit binary, fix the architecture
-        arch = {
-            'amd64': 'i386',
-            'aarch64': 'arm'
-        }.get(self.arch, self.arch)
+        arch = {"amd64": "i386", "aarch64": "arm"}.get(self.arch, self.arch)
 
         with context.local(arch=arch, bits=32, os=self.os, aslr=True):
             with context.quiet:
                 try:
-                    sc = pwnlib.shellcraft.cat('/proc/self/maps') \
-                       + pwnlib.shellcraft.exit(0)
+                    sc = pwnlib.shellcraft.cat("/proc/self/maps") + pwnlib.shellcraft.exit(0)
 
                     elf = pwnlib.elf.elf.ELF.from_assembly(sc, shared=True)
                 except Exception:
@@ -2045,6 +2095,7 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
 
                 def preexec():
                     import resource
+
                     try:
                         resource.setrlimit(resource.RLIMIT_STACK, (-1, -1))
                     except Exception:
@@ -2055,24 +2106,24 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
                 tmp = self.set_working_directory()
 
                 try:
-                    self.upload(elf.path, './aslr-test')
-                except IOError:
+                    self.upload(elf.path, "./aslr-test")
+                except OSError:
                     self.warn_once("Couldn't check ASLR ulimit trick")
                     self._aslr_ulimit = False
                     return False
 
-                self.process(['chmod', '+x', './aslr-test']).wait()
-                maps = self.process(['./aslr-test'], preexec_fn=preexec).recvall()
+                self.process(["chmod", "+x", "./aslr-test"]).wait()
+                maps = self.process(["./aslr-test"], preexec_fn=preexec).recvall()
 
                 # Move back to the old directory
                 self.cwd = cwd
 
                 # Clean up the files
-                self.process(['rm', '-rf', tmp]).wait()
+                self.process(["rm", "-rf", tmp]).wait()
 
         # Check for 555555000 (1/3 of the address space for PAE)
         # and for 40000000 (1/3 of the address space with 3BG barrier)
-        self._aslr_ulimit = bool(b'55555000' in maps or b'40000000' in maps)
+        self._aslr_ulimit = bool(b"55555000" in maps or b"40000000" in maps)
 
         return self._aslr_ulimit
 
@@ -2080,9 +2131,9 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         if self._cpuinfo_cache is None:
             with context.quiet:
                 try:
-                    self._cpuinfo_cache = self.download_data('/proc/cpuinfo', fingerprint=False)
+                    self._cpuinfo_cache = self.download_data("/proc/cpuinfo", fingerprint=False)
                 except PwnlibException:
-                    self._cpuinfo_cache = b''
+                    self._cpuinfo_cache = b""
         return self._cpuinfo_cache
 
     @property
@@ -2092,18 +2143,18 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         Example:
 
             >>> s = ssh("travis", "example.pwnme")
-            >>> s.user_shstk # doctest: +SKIP 
+            >>> s.user_shstk # doctest: +SKIP
             False
         """
         if self._user_shstk is None:
-            if self.os != 'linux':
+            if self.os != "linux":
                 self.warn_once("Only Linux is supported for userspace shadow stack checks.")
                 self._user_shstk = False
 
             else:
                 cpuinfo = self._cpuinfo()
 
-                self._user_shstk = b' user_shstk' in cpuinfo
+                self._user_shstk = b" user_shstk" in cpuinfo
         return self._user_shstk
 
     @property
@@ -2117,24 +2168,24 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
             False
         """
         if self._ibt is None:
-            if self.os != 'linux':
+            if self.os != "linux":
                 self.warn_once("Only Linux is supported for kernel indirect branch tracking checks.")
                 self._ibt = False
 
             else:
                 cpuinfo = self._cpuinfo()
 
-                self._ibt = b' ibt ' in cpuinfo or b' ibt\n' in cpuinfo
+                self._ibt = b" ibt " in cpuinfo or b" ibt\n" in cpuinfo
         return self._ibt
 
     def _checksec_cache(self, value=None):
-        path = self._get_cachefile('%s-%s' % (self.host, self.port))
+        path = self._get_cachefile("%s-%s" % (self.host, self.port))
 
         if value is not None:
-            with open(path, 'w+') as f:
+            with open(path, "w+") as f:
                 f.write(value)
         elif os.path.exists(path):
-            with open(path, 'r+') as f:
+            with open(path, "r+") as f:
                 return f.read()
 
     def checksec(self, banner=True):
@@ -2149,34 +2200,24 @@ from ctypes import *; libc = CDLL('libc.so.6'); print(libc.getenv(%r))
         if cached:
             return cached
 
-        red    = text.red
-        green  = text.green
+        red = text.red
+        green = text.green
         yellow = text.yellow
 
         res = [
             "%s@%s:" % (self.user, self.host),
-            "Distro".ljust(10) + ' '.join(self.distro),
+            "Distro".ljust(10) + " ".join(self.distro),
             "OS:".ljust(10) + self.os,
             "Arch:".ljust(10) + self.arch,
-            "Version:".ljust(10) + '.'.join(map(str, self.version)),
-
-            "ASLR:".ljust(10) + {
-                True: green("Enabled"),
-                False: red("Disabled")
-            }[self.aslr],
-            "SHSTK:".ljust(10) + {
-                True: green("Enabled"),
-                False: red("Disabled")
-            }[self.user_shstk],
-            "IBT:".ljust(10) + {
-                True: green("Enabled"),
-                False: red("Disabled")
-            }[self.ibt],
+            "Version:".ljust(10) + ".".join(map(str, self.version)),
+            "ASLR:".ljust(10) + {True: green("Enabled"), False: red("Disabled")}[self.aslr],
+            "SHSTK:".ljust(10) + {True: green("Enabled"), False: red("Disabled")}[self.user_shstk],
+            "IBT:".ljust(10) + {True: green("Enabled"), False: red("Disabled")}[self.ibt],
         ]
 
         if self.aslr_ulimit:
-            res += [ "Note:".ljust(10) + red("Susceptible to ASLR ulimit trick (CVE-2016-3672)")]
+            res += ["Note:".ljust(10) + red("Susceptible to ASLR ulimit trick (CVE-2016-3672)")]
 
-        cached = '\n'.join(res)
+        cached = "\n".join(res)
         self._checksec_cache(cached)
         return cached

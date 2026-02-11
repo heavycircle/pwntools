@@ -1,10 +1,10 @@
 """GDB Python API bridge."""
-import gdb
+from __future__ import annotations
 
-import socket
-from threading import Condition
 import time
+from threading import Condition
 
+import gdb
 from rpyc.core.protocol import Connection
 from rpyc.core.service import Service
 from rpyc.lib import spawn
@@ -14,6 +14,7 @@ from rpyc.utils.server import ThreadedServer
 
 class ServeResult:
     """Result of serving requests on GDB thread."""
+
     def __init__(self):
         self.cv = Condition()
         self.done = False
@@ -39,6 +40,7 @@ class GdbConnection(Connection):
     Serving on GDB thread might not be ideal from the responsiveness
     perspective, however, it is simple and reliable.
     """
+
     SERVE_TIME = 0.1  # Number of seconds to serve.
     IDLE_TIME = 0.1  # Number of seconds to wait after serving.
 
@@ -64,7 +66,7 @@ class GdbConnection(Connection):
                 gdb.post_event(lambda: self.serve_gdb_thread(serve_result))
                 serve_result.wait()
                 time.sleep(self.IDLE_TIME)
-        except (socket.error, select_error, IOError):
+        except (OSError, select_error):
             if not self.closed:
                 raise
         except EOFError:
@@ -82,6 +84,7 @@ class GdbService(Service):
     def exposed_set_breakpoint(self, client, has_stop, *args, **kwargs):
         """Create a breakpoint and connect it with the client-side mirror."""
         if has_stop:
+
             class Breakpoint(gdb.Breakpoint):
                 def stop(self):
                     return client.stop()
@@ -91,25 +94,32 @@ class GdbService(Service):
 
     def exposed_set_finish_breakpoint(self, client, has_stop, has_out_of_scope, *args, **kwargs):
         """Create a finish breakpoint and connect it with the client-side mirror."""
+
         class FinishBreakpoint(gdb.FinishBreakpoint):
             if has_stop:
+
                 def stop(self):
                     return client.stop()
+
             if has_out_of_scope:
+
                 def out_of_scope(self):
                     client.out_of_scope()
+
         return FinishBreakpoint(*args, **kwargs)
 
     def exposed_quit(self):
         """Terminate GDB."""
-        gdb.post_event(lambda: gdb.execute('quit'))
+        gdb.post_event(lambda: gdb.execute("quit"))
 
 
-spawn(ThreadedServer(
-    service=GdbService(),
-    socket_path=socket_path,
-    protocol_config={
-        'allow_all_attrs': True,
-        'allow_setattr': True,
-    },
-).start)
+spawn(
+    ThreadedServer(
+        service=GdbService(),
+        socket_path=socket_path,
+        protocol_config={
+            "allow_all_attrs": True,
+            "allow_setattr": True,
+        },
+    ).start
+)

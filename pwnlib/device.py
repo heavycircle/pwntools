@@ -1,5 +1,7 @@
+from __future__ import annotations
 
-class Device(object):
+
+class Device:
     arch = None
     bits = None
     endian = None

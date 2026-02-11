@@ -74,30 +74,30 @@ Example - Automated exploitation
 
 .. code-block:: python
 
-	# Assume a process that reads a string
-	# and gives this string as the first argument
-	# of a printf() call
-	# It do this indefinitely
-	p = process('./vulnerable')
+        # Assume a process that reads a string
+        # and gives this string as the first argument
+        # of a printf() call
+        # It do this indefinitely
+        p = process('./vulnerable')
 
-	# Function called in order to send a payload
-	def send_payload(payload):
-		log.info("payload = %s" % repr(payload))
-		p.sendline(payload)
-		return p.recv()
+        # Function called in order to send a payload
+        def send_payload(payload):
+                log.info("payload = %s" % repr(payload))
+                p.sendline(payload)
+                return p.recv()
 
-	# Create a FmtStr object and give to him the function
-	format_string = FmtStr(execute_fmt=send_payload)
-	format_string.write(0x0, 0x1337babe) # write 0x1337babe at 0x0
-	format_string.write(0x1337babe, 0x0) # write 0x0 at 0x1337babe
-	format_string.execute_writes()
+        # Create a FmtStr object and give to him the function
+        format_string = FmtStr(execute_fmt=send_payload)
+        format_string.write(0x0, 0x1337babe) # write 0x1337babe at 0x0
+        format_string.write(0x1337babe, 0x0) # write 0x0 at 0x1337babe
+        format_string.execute_writes()
 
 """
-from __future__ import division
+from __future__ import annotations
 
-import logging
 import re
 from operator import itemgetter
+
 from sortedcontainers import SortedList
 
 from pwnlib.log import getLogger
@@ -110,14 +110,14 @@ from pwnlib.util.packing import *
 log = getLogger(__name__)
 
 SPECIFIER = {
-    1: 'hhn',
-    2: 'hn',
-    4: 'n',
-    8: 'lln',
+    1: "hhn",
+    2: "hn",
+    4: "n",
+    8: "lln",
 }
 
 
-SZMASK = { sz: (1 << (sz * 8)) - 1 for sz in SPECIFIER }
+SZMASK = {sz: (1 << (sz * 8)) - 1 for sz in SPECIFIER}
 
 WRITE_SIZE = {
     "byte": 1,
@@ -125,6 +125,7 @@ WRITE_SIZE = {
     "int": 4,
     "long": 8,
 }
+
 
 def normalize_writes(writes):
     r"""
@@ -138,14 +139,17 @@ def normalize_writes(writes):
         [(0, b'\xef\xbe\xad\xde\xce\xfa\r\xf0'), (16, b'AAAA')]
     """
     # make all writes flat
-    writes = { address: flat(data) for address, data in writes.items() }
+    writes = {address: flat(data) for address, data in writes.items()}
 
     # merge adjacent writes (and detect overlaps)
     merged = []
     prev_end = -1
     for address, data in sorted(writes.items(), key=itemgetter(0)):
         if address < prev_end:
-            raise ValueError("normalize_writes(): data at offset %d overlaps with previous data which ends at offset %d" % (address, prev_end))
+            raise ValueError(
+                "normalize_writes(): data at offset %d overlaps with previous data which ends at offset %d"
+                % (address, prev_end)
+            )
 
         if address == prev_end and merged:
             merged[-1] = (merged[-1][0], merged[-1][1] + data)
@@ -156,13 +160,15 @@ def normalize_writes(writes):
 
     return merged
 
+
 # optimization examples (with bytes_written=0)
 #
 # 00 05 00 00     -> %n%5c%n
 # 00 00 05 00 00  -> %n%5c%n
 # 00 00 05 05 00 05  -> need overlapping writes if numbwritten > 5
 
-class AtomWrite(object):
+
+class AtomWrite:
     """
     This class represents a write action that can be carried out by a single format string specifier.
 
@@ -175,7 +181,8 @@ class AtomWrite(object):
     by the mask, the write can be directly executed with a %hn sequence (so we will write 0xaabb, but that is ok
     because the mask only requires the upper byte to be correctly written).
     """
-    __slots__ = ( "start", "size", "integer", "mask" )
+
+    __slots__ = ("start", "size", "integer", "mask")
 
     def __init__(self, start, size, integer, mask=None):
         if mask is None:
@@ -231,7 +238,8 @@ class AtomWrite(object):
         padding = 0
         while True:
             diff = wanted ^ ((counter + padding) & self.mask)
-            if not diff: break
+            if not diff:
+                break
             # this masks the least significant set bit and adds it to padding
             padding += diff & (diff ^ (diff - 1))
         return padding
@@ -265,24 +273,25 @@ class AtomWrite(object):
             newmask = (self.mask << other.bitsize) | other.mask
         return AtomWrite(self.start, self.size + other.size, newinteger, newmask)
 
-    def __getslice__(self, i,  j):
+    def __getslice__(self, i, j):
         return self.__getitem__(slice(i, j))
 
     def __getitem__(self, i):
         if not isinstance(i, slice):
             if i < 0 or i >= self.size:
                 raise IndexError("out of range [0, " + str(self.size) + "): " + str(i))
-            i = slice(i,i+1)
+            i = slice(i, i + 1)
         start, stop, step = i.indices(self.size)
         if step != 1:
             raise IndexError("slices with step != 1 not supported for AtomWrite")
 
         clip = (1 << ((stop - start) * 8)) - 1
-        if context.endian == 'little':
+        if context.endian == "little":
             shift = start * 8
-        elif context.endian == 'big':
+        elif context.endian == "big":
             shift = (self.size - stop) * 8
         return AtomWrite(self.start + start, stop - start, (self.integer >> shift) & clip, (self.mask >> shift) & clip)
+
 
 def make_atoms_simple(address, data, badbytes=frozenset()):
     """
@@ -294,7 +303,7 @@ def make_atoms_simple(address, data, badbytes=frozenset()):
 
         >>> pwnlib.fmtstr.make_atoms_simple(0x0, b"abc", set())
         [AtomWrite(start=0, size=1, integer=0x61, mask=0xff), AtomWrite(start=1, size=1, integer=0x62, mask=0xff), AtomWrite(start=2, size=1, integer=0x63, mask=0xff)]
-    
+
     If there are bad bytes, it will try to bypass by skipping addresses containing bad bytes, otherwise a
     RuntimeError will be raised:
 
@@ -346,16 +355,19 @@ def merge_atoms_writesize(atoms, maxsize):
         best = (1, atoms[0])
         candidate = atoms[0]
         for idx, atom in enumerate(atoms[1:]):
-            if candidate.end != atom.start: break
+            if candidate.end != atom.start:
+                break
 
             candidate = candidate.union(atom)
-            if candidate.size > maxsize: break
+            if candidate.size > maxsize:
+                break
             if candidate.size in SPECIFIER:
-                best = (idx+2, candidate)
+                best = (idx + 2, candidate)
 
         out += [best[1]]
-        atoms[:best[0]] = []
+        atoms[: best[0]] = []
     return out
+
 
 def find_min_hamming_in_range_step(prev, step, carry, strict):
     """
@@ -415,6 +427,7 @@ def find_min_hamming_in_range_step(prev, step, carry, strict):
         return prev_for_other[0], (prev_for_other[1] << 8) | lowcarrybyte, (prev_for_other[2] << 8)
     return None
 
+
 def find_min_hamming_in_range(maxbytes, lower, upper, target):
     """
     Find the value which differs in the least amount of bytes from the target and is in the given range.
@@ -451,18 +464,20 @@ def find_min_hamming_in_range(maxbytes, lower, upper, target):
 
     # the initial state
     prev = {
-        (False,False): (0, 0, 0),
-        (False,True): None if upper == lower else (0, lower, 0),
-        (True,False): None if upper == lower else (0, lower, 0),
-        (True,True): None if upper <= lower + 1 else (0, lower + 1, 0)
+        (False, False): (0, 0, 0),
+        (False, True): None if upper == lower else (0, lower, 0),
+        (True, False): None if upper == lower else (0, lower, 0),
+        (True, True): None if upper <= lower + 1 else (0, lower + 1, 0),
     }
     for step in reversed(steps):
         prev = {
-            (carry, strict): find_min_hamming_in_range_step(prev, step, carry, strict )
+            (carry, strict): find_min_hamming_in_range_step(prev, step, carry, strict)
             for carry in [False, True]
             for strict in [False, True]
         }
-    return prev[(False,False)]
+    return prev[(False, False)]
+
+
 #
 # what we don't do:
 #  - create new atoms that cannot be created by merging existing atoms
@@ -504,7 +519,8 @@ def merge_atoms_overlapping(atoms, sz, szmax, numbwritten, overflows):
     numbwritten_at = [numbwritten for _ in atoms]
     out = []
     for idx, atom in enumerate(atoms):
-        if done[idx]: continue
+        if done[idx]:
+            continue
         numbwritten_here = numbwritten_at[idx]
 
         # greedily find the best possible write at the current offset
@@ -522,8 +538,10 @@ def merge_atoms_overlapping(atoms, sz, szmax, numbwritten, overflows):
             # check that we are still within the limits and that the candidate
             # can be written with a format specifier (this excludes non-power-of-2 candidate sizes)
             candidate = candidate.union(nextatom)
-            if candidate.size not in SPECIFIER: continue
-            if candidate.size > szmax: break
+            if candidate.size not in SPECIFIER:
+                continue
+            if candidate.size > szmax:
+                break
 
             # now approximate the candidate if it is larger than the always allowed size (sz),
             # taking the `maxwritten` constraint into account
@@ -540,18 +558,17 @@ def merge_atoms_overlapping(atoms, sz, szmax, numbwritten, overflows):
 
         _, nextidx, best_candidate = best
         numbwritten_here += best_candidate.compute_padding(numbwritten_here)
-        if numbwritten_here > maxwritten:
-            maxwritten = numbwritten_here
+        maxwritten = max(maxwritten, numbwritten_here)
         offset = 0
 
         # for all atoms that we merged, check if all bytes are written already to update `done``
         # also update the numbwritten_at for all the indices covered by the current best_candidate
-        for i, iatom in enumerate(atoms[idx:nextidx+1], idx):
+        for i, iatom in enumerate(atoms[idx : nextidx + 1], idx):
             shift = iatom.size
 
             # if there are no parts in the atom's that are not written by the candidate,
             # mark it as done
-            if not (iatom.mask & (~best_candidate[offset:offset+shift].mask)):
+            if not (iatom.mask & (~best_candidate[offset : offset + shift].mask)):
                 done[i] = True
             else:
                 # numbwritten_at is only relevant for atoms that aren't done yet,
@@ -563,6 +580,7 @@ def merge_atoms_overlapping(atoms, sz, szmax, numbwritten, overflows):
         # emit the best candidate
         out += [best_candidate]
     return out
+
 
 def overlapping_atoms(atoms):
     """
@@ -594,10 +612,11 @@ def overlapping_atoms(atoms):
         if atom.end > prev.end:
             prev = atom
 
-class AtomQueue(object):
+
+class AtomQueue:
     def __init__(self, numbwritten):
-        self.queues = { sz: SortedList(key=lambda atom: atom.integer) for sz in SPECIFIER.keys() }
-        self.positions = { sz: 0 for sz in SPECIFIER }
+        self.queues = {sz: SortedList(key=lambda atom: atom.integer) for sz in SPECIFIER.keys()}
+        self.positions = {sz: 0 for sz in SPECIFIER}
         self.numbwritten = numbwritten
 
     def add(self, atom):
@@ -607,13 +626,13 @@ class AtomQueue(object):
 
     def pop(self):
         # find queues that still have items left
-        active_sizes = [ sz for sz,p in self.positions.items() if p < len(self.queues[sz]) ]
+        active_sizes = [sz for sz, p in self.positions.items() if p < len(self.queues[sz])]
 
         # if all queues are exhausted, reset the one for the lowest size atoms
         # resetting a queue means the counter overflows (for this size)
         if not active_sizes:
             try:
-                sz_reset = min(sz for sz,q in self.queues.items() if q)
+                sz_reset = min(sz for sz, q in self.queues.items() if q)
             except ValueError:
                 # all queues are empty, so there are no atoms left
                 return None
@@ -622,11 +641,14 @@ class AtomQueue(object):
             active_sizes = [sz_reset]
 
         # find the queue that requires the least amount of counter change
-        best_size = min(active_sizes, key=lambda sz: self.queues[sz][self.positions[sz]].compute_padding(self.numbwritten))
+        best_size = min(
+            active_sizes, key=lambda sz: self.queues[sz][self.positions[sz]].compute_padding(self.numbwritten)
+        )
         best_atom = self.queues[best_size].pop(self.positions[best_size])
         self.numbwritten += best_atom.compute_padding(self.numbwritten)
 
         return best_atom
+
 
 def sort_atoms(atoms, numbwritten):
     """
@@ -657,11 +679,11 @@ def sort_atoms(atoms, numbwritten):
     # to [b, a] since then a would overwrite parts of what b wrote.
     #
     # a depends on b means: a must happen after b --> depgraph[a] contains b
-    order = { atom: i for i,atom in enumerate(atoms) }
+    order = {atom: i for i, atom in enumerate(atoms)}
 
-    depgraph = { atom: set() for atom in atoms }
-    rdepgraph = { atom: set() for atom in atoms }
-    for atom1,atom2 in overlapping_atoms(atoms):
+    depgraph = {atom: set() for atom in atoms}
+    rdepgraph = {atom: set() for atom in atoms}
+    for atom1, atom2 in overlapping_atoms(atoms):
         if order[atom1] < order[atom2]:
             depgraph[atom2].add(atom1)
             rdepgraph[atom1].add(atom2)
@@ -678,7 +700,7 @@ def sort_atoms(atoms, numbwritten):
     out = []
     while True:
         atom = queue.pop()
-        if not atom: # we are done
+        if not atom:  # we are done
             break
 
         out.append(atom)
@@ -693,8 +715,9 @@ def sort_atoms(atoms, numbwritten):
 
     return out
 
+
 def make_payload_dollar(data_offset, atoms, numbwritten=0, countersize=4, no_dollars=False):
-    r'''
+    r"""
     Makes a format-string payload using glibc's dollar syntax to access the arguments.
 
     Returns:
@@ -706,13 +729,13 @@ def make_payload_dollar(data_offset, atoms, numbwritten=0, countersize=4, no_dol
         atoms(list): list of atoms to execute
         numbwritten(int): number of byte already written by the printf function
         countersize(int): size in bytes of the format string counter (usually 4)
-        no_dollars(bool) : flag to generete the payload with or w/o $ notation 
+        no_dollars(bool) : flag to generete the payload with or w/o $ notation
 
     Examples:
 
         >>> pwnlib.fmtstr.make_payload_dollar(1, [pwnlib.fmtstr.AtomWrite(0x0, 0x1, 0xff)])
         (b'%255c%1$hhn', b'\x00\x00\x00\x00')
-    '''
+    """
     data = b""
     fmt = ""
 
@@ -730,21 +753,21 @@ def make_payload_dollar(data_offset, atoms, numbwritten=0, countersize=4, no_dol
         counter = (counter + padding) % (1 << (countersize * 8))
         if countersize == 32 and counter > 2147483600:
             log.warn("number of written bytes in format string close to 1 << 31. this will likely not work on glibc")
-        if padding >= (1 << (countersize*8-1)):
+        if padding >= (1 << (countersize * 8 - 1)):
             log.warn("padding is negative, this will not work on glibc")
 
         # perform write
         # if the padding is less than 3, it is more convenient to write it : [ len("cc") < len("%2c") ] , this could help save some bytes, if it is 3 it will take the same amout of bytes
         # we also add ( context.bytes * no_dollars ) because , "%nccccccccc%n...ptr1ptr2" is more convenient than %"n%8c%n...ptr1ccccccccptr2"
         if padding < 4 + context.bytes * no_dollars:
-                fmt += "c" * padding
-                ## if do not padded with %{n}c  do not need to add something in data to use as argument, since  we are not using a printf argument
-        else: 
+            fmt += "c" * padding
+            ## if do not padded with %{n}c  do not need to add something in data to use as argument, since  we are not using a printf argument
+        else:
             fmt += "%" + str(padding) + "c"
 
             if no_dollars:
-                data += b'c' * context.bytes
-                ''' 
+                data += b"c" * context.bytes
+                """ 
                 [ @murph12F was here ]
 
                 the data += b'c' * context.bytes , is used to keey the arguments aligned when a %c is performed, so it wont use the actual address to write at
@@ -775,16 +798,17 @@ def make_payload_dollar(data_offset, atoms, numbwritten=0, countersize=4, no_dol
                     ---------
 
                     now it will perform the %hhn, and it will correctly use the addr1 argument
-                '''
-            
+                """
+
         if no_dollars:
-            fmt += "%" +  SPECIFIER[atom.size]
+            fmt += "%" + SPECIFIER[atom.size]
         else:
             fmt += "%" + str(data_offset + idx) + "$" + SPECIFIER[atom.size]
 
         data += pack(atom.start)
 
     return fmt.encode(), data
+
 
 def make_atoms(writes, sz, szmax, numbwritten, overflows, strategy, badbytes):
     """
@@ -808,9 +832,9 @@ def make_atoms(writes, sz, szmax, numbwritten, overflows, strategy, badbytes):
     all_atoms = []
     for address, data in normalize_writes(writes):
         atoms = make_atoms_simple(address, data, badbytes)
-        if strategy == 'small':
+        if strategy == "small":
             atoms = merge_atoms_overlapping(atoms, sz, szmax, numbwritten, overflows)
-        elif strategy == 'fast':
+        elif strategy == "fast":
             atoms = merge_atoms_writesize(atoms, sz)
         else:
             raise ValueError("strategy must be either 'small' or 'fast'")
@@ -818,14 +842,25 @@ def make_atoms(writes, sz, szmax, numbwritten, overflows, strategy, badbytes):
         all_atoms += atoms
     return all_atoms
 
-def fmtstr_split(offset, writes, numbwritten=0, write_size='byte', write_size_max='long', overflows=16, strategy="small", badbytes=frozenset(), no_dollars=False):
+
+def fmtstr_split(
+    offset,
+    writes,
+    numbwritten=0,
+    write_size="byte",
+    write_size_max="long",
+    overflows=16,
+    strategy="small",
+    badbytes=frozenset(),
+    no_dollars=False,
+):
     """
     Build a format string like fmtstr_payload but return the string and data separately.
     """
-    if write_size not in ['byte', 'short', 'int']:
+    if write_size not in ["byte", "short", "int"]:
         log.error("write_size must be 'byte', 'short' or 'int'")
 
-    if write_size_max not in ['byte', 'short', 'int', 'long']:
+    if write_size_max not in ["byte", "short", "int", "long"]:
         log.error("write_size_max must be 'byte', 'short', 'int' or 'long'")
 
     sz = WRITE_SIZE[write_size]
@@ -834,7 +869,19 @@ def fmtstr_split(offset, writes, numbwritten=0, write_size='byte', write_size_ma
 
     return make_payload_dollar(offset, atoms, numbwritten, no_dollars=no_dollars)
 
-def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte', write_size_max='long', overflows=16, strategy="small", badbytes=frozenset(), offset_bytes=0, no_dollars=False):
+
+def fmtstr_payload(
+    offset,
+    writes,
+    numbwritten=0,
+    write_size="byte",
+    write_size_max="long",
+    overflows=16,
+    strategy="small",
+    badbytes=frozenset(),
+    offset_bytes=0,
+    no_dollars=False,
+):
     r"""fmtstr_payload(offset, writes, numbwritten=0, write_size='byte') -> str
 
     Makes payload with given parameter.
@@ -857,7 +904,7 @@ def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte', write_size_
         write_size(str): must be ``byte``, ``short`` or ``int``. Tells if you want to write byte by byte, short by short or int by int (hhn, hn or n)
         overflows(int): how many extra overflows (at size sz) to tolerate to reduce the length of the format string
         strategy(str): either 'fast' or 'small' ('small' is default, 'fast' can be used if there are many writes)
-        no_dollars(bool) : flag to generete the payload with or w/o $ notation 
+        no_dollars(bool) : flag to generete the payload with or w/o $ notation
     Returns:
         The payload in order to do needed writes
 
@@ -866,7 +913,7 @@ def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte', write_size_
         >>> context.clear(arch = 'amd64')
         >>> fmtstr_payload(1, {0x0: 0x1337babe}, write_size='int')
         b'%322419390c%4$llnaaaabaa\x00\x00\x00\x00\x00\x00\x00\x00'
-	>>> fmtstr_payload(1, {0x0: p32(0x1337babe)}, write_size='int')
+        >>> fmtstr_payload(1, {0x0: p32(0x1337babe)}, write_size='int')
         b'%322419390c%3$na\x00\x00\x00\x00\x00\x00\x00\x00'
         >>> fmtstr_payload(1, {0x0: 0x1337babe}, write_size='short')
         b'%47806c%5$lln%22649c%6$hnaaaabaa\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00'
@@ -883,8 +930,8 @@ def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte', write_size_
         b'%19c%12$hhn%36c%13$hhn%131c%14$hhn%4c%15$hhn\x03\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00'
         >>> fmtstr_payload(1, {0x0: 0x00000001}, write_size='byte')
         b'c%3$naaa\x00\x00\x00\x00'
-	>>> fmtstr_payload(1, {0x0: b'\x01'}, write_size='byte')
-	b'c%3$hhna\x00\x00\x00\x00'
+        >>> fmtstr_payload(1, {0x0: b'\x01'}, write_size='byte')
+        b'c%3$hhna\x00\x00\x00\x00'
         >>> fmtstr_payload(1, {0x0: b"\xff\xff\x04\x11\x00\x00\x00\x00"}, write_size='short')
         b'%327679c%7$lln%18c%8$hhn\x00\x00\x00\x00\x03\x00\x00\x00'
         >>> fmtstr_payload(10, {0x404048 : 0xbadc0ffe, 0x40403c : 0xdeadbeef}, no_dollars=True)
@@ -902,7 +949,7 @@ def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte', write_size_
     for _ in range(1000000):
         data_offset = (offset_bytes + len(fmt)) // context.bytes
         fmt, data = make_payload_dollar(offset + data_offset, all_atoms, numbwritten=numbwritten, no_dollars=no_dollars)
-        fmt = fmt + cyclic((-len(fmt)-offset_bytes) % context.bytes)
+        fmt = fmt + cyclic((-len(fmt) - offset_bytes) % context.bytes)
 
         if len(fmt) + offset_bytes == data_offset * context.bytes:
             break
@@ -911,7 +958,8 @@ def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte', write_size_
 
     return fmt + data
 
-class FmtStr(object):
+
+class FmtStr:
     """
     Provides an automated format string exploitation.
 
@@ -949,13 +997,13 @@ class FmtStr(object):
 
     def leak_stack(self, offset, prefix=b""):
         if self.no_dollars:
-            payload = b'%c' * (offset - 1) + b'START%pEND'
+            payload = b"%c" * (offset - 1) + b"START%pEND"
         else:
             payload = b"START%%%d$pEND" % offset
 
         leak = self.execute_fmt(prefix + payload)
         try:
-            leak = re.findall(br"START(.*?)END", leak, re.MULTILINE | re.DOTALL)[0]
+            leak = re.findall(rb"START(.*?)END", leak, re.MULTILINE | re.DOTALL)[0]
             leak = int(leak, 16)
         except ValueError:
             leak = 0
@@ -965,16 +1013,15 @@ class FmtStr(object):
 
     def find_offset(self):
         marker = cyclic(context.bytes + 3)
-        for off in range(1,1000):
+        for off in range(1, 1000):
             leak = self.leak_stack(off, marker)
             leak = pack(leak)
 
             pad = cyclic_find(leak[:4])
             if 0 <= pad < context.bytes:
                 return off, pad
-        else:
-            log.error("Could not find offset to format string on stack")
-            return None, None
+        log.error("Could not find offset to format string on stack")
+        return None, None
 
     def _leaker(self, addr):
         # Hack: elfheaders often start at offset 0 in a page,
@@ -983,14 +1030,14 @@ class FmtStr(object):
         # Thus the solution to this problem is to check if the next 3 bytes are
         # "ELF" and if so we lie and leak "\x7f"
         # unless it is leaked otherwise.
-        if addr & 0xfff == 0 and self.leaker._leak(addr+1, 3, False) == b"ELF":
+        if addr & 0xFFF == 0 and self.leaker._leak(addr + 1, 3, False) == b"ELF":
             return b"\x7f"
 
         max_len = self.padlen + 8 + context.bytes
         for _ in range(33):
             offset = self.offset + max_len // context.bytes
             if self.no_dollars:
-                payload = b'%c' * (offset - 1) + b'START%sEND'
+                payload = b"%c" * (offset - 1) + b"START%sEND"
             else:
                 payload = b"START%%%d$sEND" % offset
             if len(payload) > max_len:
@@ -1000,15 +1047,10 @@ class FmtStr(object):
         else:
             raise RuntimeError("this is a bug ... format string building did not converge")
 
-        fmtstr = fit({
-          self.padlen: {
-              0: payload,
-              max_len: addr
-          }
-        })
+        fmtstr = fit({self.padlen: {0: payload, max_len: addr}})
 
         leak = self.execute_fmt(fmtstr)
-        leak = re.findall(br"START(.*)END", leak, re.MULTILINE | re.DOTALL)[0]
+        leak = re.findall(rb"START(.*)END", leak, re.MULTILINE | re.DOTALL)[0]
 
         leak += b"\x00"
 
@@ -1024,7 +1066,14 @@ class FmtStr(object):
 
         """
         fmtstr = randoms(self.padlen).encode()
-        fmtstr += fmtstr_payload(self.offset, self.writes, numbwritten=self.padlen + self.numbwritten, badbytes=self.badbytes, no_dollars=self.no_dollars, write_size='byte')
+        fmtstr += fmtstr_payload(
+            self.offset,
+            self.writes,
+            numbwritten=self.padlen + self.numbwritten,
+            badbytes=self.badbytes,
+            no_dollars=self.no_dollars,
+            write_size="byte",
+        )
         self.execute_fmt(fmtstr)
         self.writes = {}
 

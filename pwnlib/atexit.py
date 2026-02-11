@@ -7,21 +7,22 @@ this replacement module also defines :func:`unregister`.
 This module also fixes a the issue that exceptions raised by an exit handler is
 printed twice when the standard :mod:`atexit` is used.
 """
-from __future__ import absolute_import
-from __future__ import division
 
+from __future__ import annotations
+
+import atexit as std_atexit
 import sys
 import threading
 import traceback
-import atexit as std_atexit
 
 from pwnlib.context import context
 
-__all__ = ['register', 'unregister']
+__all__ = ["register", "unregister"]
 
 _lock = threading.Lock()
 _ident = 0
 _handlers = {}
+
 
 def register(func, *args, **kwargs):
     """register(func, *args, **kwargs)
@@ -59,6 +60,7 @@ def register(func, *args, **kwargs):
     _handlers[ident] = (func, args, kwargs, vars(context))
     return ident
 
+
 def unregister(ident):
     """unregister(ident)
 
@@ -67,6 +69,7 @@ def unregister(ident):
     """
     if ident in _handlers:
         del _handlers[ident]
+
 
 def _run_handlers():
     """_run_handlers()
@@ -79,8 +82,7 @@ def _run_handlers():
     called for that reason.
     """
     context.clear()
-    for _ident, (func, args, kwargs, ctx) in \
-        sorted(_handlers.items(), reverse = True):
+    for _ident, (func, args, kwargs, ctx) in sorted(_handlers.items(), reverse=True):
         try:
             with context.local(**ctx):
                 func(*args, **kwargs)
@@ -92,6 +94,7 @@ def _run_handlers():
             typ, val, tb = sys.exc_info()
             traceback.print_exception(typ, val, tb.tb_next)
 
+
 # if there's already an exitfunc registered be sure to run that too
 if hasattr(sys, "exitfunc"):
     register(sys.exitfunc)
@@ -100,4 +103,3 @@ if sys.version_info[0] < 3:
     sys.exitfunc = _run_handlers
 else:
     std_atexit.register(_run_handlers)
-

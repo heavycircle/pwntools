@@ -1,68 +1,83 @@
-# -*- coding: utf-8 -*-
 """
 Timeout encapsulation, complete with countdowns and scope managers.
 """
-from __future__ import division
+from __future__ import annotations
 
 import time
 
 import pwnlib
 
 
-class _DummyContextClass(object):
-    def __enter__(self):   pass
-    def __exit__(self,*a): pass
+class _DummyContextClass:
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *a):
+        pass
+
 
 _DummyContext = _DummyContextClass()
 
-class _countdown_handler(object):
+
+class _countdown_handler:
     def __init__(self, obj, timeout):
-        self.obj     = obj
+        self.obj = obj
         self.timeout = timeout
 
     def __enter__(self):
-        self.old_timeout  = self.obj._timeout
-        self.old_stop     = self.obj._stop
+        self.old_timeout = self.obj._timeout
+        self.old_stop = self.obj._stop
 
-        self.obj._stop    = time.time() + self.timeout
+        self.obj._stop = time.time() + self.timeout
 
         if self.old_stop:
             self.obj._stop = min(self.obj._stop, self.old_stop)
 
         self.obj._timeout = self.timeout
         self.obj.timeout_change()
+
     def __exit__(self, *a):
         self.obj._timeout = self.old_timeout
-        self.obj._stop    = self.old_stop
+        self.obj._stop = self.old_stop
         self.obj.timeout_change()
 
-class _local_handler(object):
+
+class _local_handler:
     def __init__(self, obj, timeout):
-        self.obj     = obj
+        self.obj = obj
         self.timeout = timeout
-    def __enter__(self):
-        self.old_timeout  = self.obj._timeout
-        self.old_stop     = self.obj._stop
 
-        self.obj._stop    = 0
-        self.obj._timeout = self.timeout # leverage validation
+    def __enter__(self):
+        self.old_timeout = self.obj._timeout
+        self.old_stop = self.obj._stop
+
+        self.obj._stop = 0
+        self.obj._timeout = self.timeout  # leverage validation
         self.obj.timeout_change()
 
     def __exit__(self, *a):
         self.obj._timeout = self.old_timeout
-        self.obj._stop    = self.old_stop
+        self.obj._stop = self.old_stop
         self.obj.timeout_change()
 
-class TimeoutDefault(object):
-    def __repr__(self): return "pwnlib.timeout.Timeout.default"
-    def __str__(self): return "<default timeout>"
+
+class TimeoutDefault:
+    def __repr__(self):
+        return "pwnlib.timeout.Timeout.default"
+
+    def __str__(self):
+        return "<default timeout>"
+
 
 class Maximum(float):
     def __repr__(self):
-        return 'pwnlib.timeout.maximum'
+        return "pwnlib.timeout.maximum"
+
+
 maximum = Maximum(2**20)
 
-class Timeout(object):
+
+class Timeout:
     """
     Implements a basic class which has a timeout, and support for
     scoped timeout countdowns.
@@ -111,7 +126,6 @@ class Timeout(object):
         5.0
     """
 
-
     #: Value indicating that the timeout should not be changed
     default = TimeoutDefault()
 
@@ -127,7 +141,7 @@ class Timeout(object):
     maximum = maximum
 
     def __init__(self, timeout=default):
-        self._stop    = 0
+        self._stop = 0
         self.timeout = self._get_timeout_seconds(timeout)
 
     @property
@@ -136,12 +150,12 @@ class Timeout(object):
         Timeout for obj operations.  By default, uses ``context.timeout``.
         """
         timeout = self._timeout
-        stop    = self._stop
+        stop = self._stop
 
         if not stop:
             return timeout
 
-        return max(stop-time.time(), 0)
+        return max(stop - time.time(), 0)
 
     @timeout.setter
     def timeout(self, value):
@@ -162,8 +176,7 @@ class Timeout(object):
             if value < 0:
                 raise AttributeError("timeout: Timeout cannot be negative")
 
-            if value > self.maximum:
-                value = self.maximum
+            value = min(value, self.maximum)
         return value
 
     def countdown_active(self):
@@ -175,7 +188,7 @@ class Timeout(object):
         """
         pass
 
-    def countdown(self, timeout = default):
+    def countdown(self, timeout=default):
         """
         Scoped timeout setter.  Sets the timeout within the scope,
         and restores it when leaving the scope.

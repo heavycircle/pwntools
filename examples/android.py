@@ -1,6 +1,7 @@
-from __future__ import print_function
+from __future__ import annotations
 
 import gdb
+
 from pwn import adb, context
 
 # Tell pwntools that the target is an Android device

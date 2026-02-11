@@ -1,5 +1,5 @@
-"""Improved replacements for standard functions
-"""
+"""Improved replacements for standard functions"""
+from __future__ import annotations
 
 import time as __time
 

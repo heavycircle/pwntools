@@ -1,20 +1,18 @@
+from __future__ import annotations
+
 from pwn import *
 
-context.arch='arm'
+context.arch = "arm"
 frame = SigreturnFrame()
 
-registers = ['r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7',
-             'r8', 'r9', 'r10', 'fp', 'ip', 'pc', 'lr']
+registers = ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "fp", "ip", "pc", "lr"]
 
 
 for index, register in enumerate(registers):
     setattr(frame, register, index)
 frame.sp = 64
 
-assembly = '\n'.join([
-    shellcraft.read(constants.STDIN_FILENO, 'sp', 1024),
-    shellcraft.sigreturn()
-])
+assembly = "\n".join([shellcraft.read(constants.STDIN_FILENO, "sp", 1024), shellcraft.sigreturn()])
 
 binary = ELF.from_assembly(assembly)
 

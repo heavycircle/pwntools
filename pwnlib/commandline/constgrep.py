@@ -1,62 +1,68 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import argparse
 import functools
 import re
 
 import pwnlib.args
+
 pwnlib.args.free_form = False
 
 from pwn import *
 from pwnlib.commandline import common
 
 p = common.parser_commands.add_parser(
-    'constgrep',
-    help = "Looking up constants from header files.\n\nExample: constgrep -c freebsd -m  ^PROT_ '3 + 4'",
-    description = "Looking up constants from header files.\n\nExample: constgrep -c freebsd -m  ^PROT_ '3 + 4'",
-    formatter_class = argparse.RawDescriptionHelpFormatter,
+    "constgrep",
+    help="Looking up constants from header files.\n\nExample: constgrep -c freebsd -m  ^PROT_ '3 + 4'",
+    description="Looking up constants from header files.\n\nExample: constgrep -c freebsd -m  ^PROT_ '3 + 4'",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 
 p.add_argument(
-    '-e', '--exact',
-    action='store_true',
-    help='Do an exact match for a constant instead of searching for a regex',
+    "-e",
+    "--exact",
+    action="store_true",
+    help="Do an exact match for a constant instead of searching for a regex",
 )
 
 p.add_argument(
-    'regex',
-    help='The regex matching constant you want to find',
+    "regex",
+    help="The regex matching constant you want to find",
 )
 
 p.add_argument(
-    'constant',
-    nargs = '?',
-    default = None,
-    type = safeeval.expr,
-    help = 'The constant to find',
+    "constant",
+    nargs="?",
+    default=None,
+    type=safeeval.expr,
+    help="The constant to find",
 )
 
 p.add_argument(
-    '-i', '--case-insensitive',
-    action = 'store_true',
-    help = 'Search case insensitive',
+    "-i",
+    "--case-insensitive",
+    action="store_true",
+    help="Search case insensitive",
 )
 
 p.add_argument(
-    '-m', '--mask-mode',
-    action = 'store_true',
-    help = 'Instead of searching for a specific constant value, search for values not containing strictly less bits that the given value.',
+    "-m",
+    "--mask-mode",
+    action="store_true",
+    help="Instead of searching for a specific constant value, search for values not containing strictly less bits that the given value.",
 )
 
 p.add_argument(
-    '-c', '--context',
-    metavar = 'arch_or_os',
-    action = 'append',
-    type   = common.context_arg,
-    choices = common.choices,
-    help = 'The os/architecture/endianness/bits the shellcode will run in (default: linux/i386), choose from: %s' % common.choices,
+    "-c",
+    "--context",
+    metavar="arch_or_os",
+    action="append",
+    type=common.context_arg,
+    choices=common.choices,
+    help="The os/architecture/endianness/bits the shellcode will run in (default: linux/i386), choose from: %s"
+    % common.choices,
 )
+
 
 def main(args):
     if args.exact:
@@ -65,7 +71,7 @@ def main(args):
     else:
         # New we search in the right module.
         # But first: We find the right module
-        if context.os == 'freebsd':
+        if context.os == "freebsd":
             mod = constants.freebsd
         else:
             mod = getattr(getattr(constants, context.os), context.arch)
@@ -77,14 +83,14 @@ def main(args):
             matcher = re.compile(args.regex)
 
         # The found matching constants and the length of the longest string
-        out    = []
+        out = []
         maxlen = 0
 
         constant = args.constant
 
         for k in dir(mod):
             # No python stuff
-            if k.endswith('__') and k.startswith('__'):
+            if k.endswith("__") and k.startswith("__"):
                 continue
 
             # Run the regex
@@ -101,9 +107,8 @@ def main(args):
                 if args.mask_mode:
                     if constant & val != val:
                         continue
-                else:
-                    if constant != val:
-                        continue
+                elif constant != val:
+                    continue
 
             # Append it
             out.append((val, k))
@@ -111,7 +116,7 @@ def main(args):
 
         # Output all matching constants
         for _, k in sorted(out):
-            print('#define %s %s' % (k.ljust(maxlen), cpp(k).strip()))
+            print("#define %s %s" % (k.ljust(maxlen), cpp(k).strip()))
 
         # If we are in match_mode, then try to find a combination of
         # constants that yield the exact given value
@@ -129,8 +134,9 @@ def main(args):
                 out = [(v, k) for v, k in out if mask & v == v]
 
             if functools.reduce(lambda x, cur: x | cur[0], good, 0) == constant:
-                print('')
-                print('(%s) == %s' % (' | '.join(k for v, k in good), args.constant))
+                print("")
+                print("(%s) == %s" % (" | ".join(k for v, k in good), args.constant))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     pwnlib.commandline.common.main(__file__, main)

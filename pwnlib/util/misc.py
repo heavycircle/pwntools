@@ -1,18 +1,16 @@
-from __future__ import division
+from __future__ import annotations
 
-import json
-import base64
 import errno
+import inspect
+import json
 import os
 import re
 import signal
 import socket
 import stat
-import string
 import subprocess
 import sys
 import tempfile
-import inspect
 import time
 import types
 
@@ -20,11 +18,10 @@ from pwnlib import atexit
 from pwnlib.context import context
 from pwnlib.log import getLogger
 from pwnlib.timeout import Timeout
-from pwnlib.util import fiddling
-from pwnlib.util import lists
-from pwnlib.util import packing
+from pwnlib.util import lists, packing
 
 log = getLogger(__name__)
+
 
 def align(alignment, x):
     """align(alignment, x) -> int
@@ -65,7 +62,7 @@ def binary_ip(host):
     return socket.inet_aton(socket.gethostbyname(host))
 
 
-def size(n, abbrev = 'B', si = False):
+def size(n, abbrev="B", si=False):
     """size(n, abbrev = 'B', si = False) -> str
 
     Convert the length of a bytestream to human readable form.
@@ -94,19 +91,20 @@ def size(n, abbrev = 'B', si = False):
         >>> size([1,2,3])
         '3B'
     """
-    if hasattr(n, '__len__'):
+    if hasattr(n, "__len__"):
         n = len(n)
 
     base = 1000.0 if si else 1024.0
     if n < base:
-        return '%d%s' % (n, abbrev)
+        return "%d%s" % (n, abbrev)
 
-    for suffix in ['K', 'M', 'G', 'T']:
+    for suffix in ["K", "M", "G", "T"]:
         n /= base
         if n < base:
-            return '%.02f%s%s' % (n, suffix, abbrev)
+            return "%.02f%s%s" % (n, suffix, abbrev)
 
-    return '%.02fP%s' % (n / base, abbrev)
+    return "%.02fP%s" % (n / base, abbrev)
+
 
 KB = 1000
 MB = 1000 * KB
@@ -115,6 +113,7 @@ GB = 1000 * MB
 KiB = 1024
 MiB = 1024 * KiB
 GiB = 1024 * MiB
+
 
 def read(path, count=-1, skip=0):
     r"""read(path, count=-1, skip=0) -> str
@@ -127,23 +126,25 @@ def read(path, count=-1, skip=0):
         b'\x7fELF'
     """
     path = os.path.expanduser(os.path.expandvars(path))
-    with open(path, 'rb') as fd:
+    with open(path, "rb") as fd:
         if skip:
             fd.seek(skip)
         return fd.read(count)
 
 
-def write(path, data = b'', create_dir = False, mode = 'w'):
+def write(path, data=b"", create_dir=False, mode="w"):
     """Create new file or truncate existing to zero length and write data."""
     path = os.path.expanduser(os.path.expandvars(path))
     if create_dir:
         path = os.path.realpath(path)
         mkdir_p(os.path.dirname(path))
-    if mode == 'w' and isinstance(data, bytes): mode += 'b'
+    if mode == "w" and isinstance(data, bytes):
+        mode += "b"
     with open(path, mode) as f:
         f.write(data)
 
-def which(name, all = False, path=None):
+
+def which(name, all=False, path=None):
     """which(name, flags = os.X_OK, all = False) -> str or str set
 
     Works as the system command ``which``; searches $PATH for ``name`` and
@@ -170,18 +171,18 @@ def which(name, all = False, path=None):
     if os.path.sep in name:
         return name
 
-    if sys.platform == 'win32':
-        pathexts = os.environ.get('PATHEXT', '').split(os.pathsep)
+    if sys.platform == "win32":
+        pathexts = os.environ.get("PATHEXT", "").split(os.pathsep)
         isroot = False
     else:
         pathexts = []
         isroot = os.getuid() == 0
-    pathexts = [''] + pathexts
+    pathexts = [""] + pathexts
     out = set()
     try:
-        path = path or os.environ['PATH']
+        path = path or os.environ["PATH"]
     except KeyError:
-        log.exception('Environment variable $PATH is not set')
+        log.exception("Environment variable $PATH is not set")
     for path_part in path.split(os.pathsep):
         for ext in pathexts:
             nameext = name + ext
@@ -191,8 +192,7 @@ def which(name, all = False, path=None):
                 if not stat.S_ISREG(st.st_mode):
                     continue
                 # work around this issue: https://bugs.python.org/issue9311
-                if isroot and not \
-                st.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH):
+                if isroot and not st.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH):
                     continue
                 if all:
                     out.add(p)
@@ -217,7 +217,7 @@ def normalize_argv_env(argv, env, log, level=2):
         argv = [argv]
 
     if not isinstance(argv, (list, tuple)):
-        log.error('argv must be a list or tuple: %r' % argv)
+        log.error("argv must be a list or tuple: %r" % argv)
 
     if not all(isinstance(arg, (str, bytes, bytearray)) for arg in argv):
         log.error("argv must be strings or bytes: %r" % argv)
@@ -227,9 +227,9 @@ def normalize_argv_env(argv, env, log, level=2):
 
     for i, oarg in enumerate(argv):
         arg = packing._need_bytes(oarg, level, 0x80)  # ASCII text is okay
-        if b'\x00' in arg[:-1]:
-            log.error('Inappropriate nulls in argv[%i]: %r' % (i, oarg))
-        argv[i] = bytearray(arg.rstrip(b'\x00'))
+        if b"\x00" in arg[:-1]:
+            log.error("Inappropriate nulls in argv[%i]: %r" % (i, oarg))
+        argv[i] = bytearray(arg.rstrip(b"\x00"))
 
     #
     # Validate environment
@@ -240,27 +240,27 @@ def normalize_argv_env(argv, env, log, level=2):
 
     # Create a duplicate so we can modify it safely
     env2 = []
-    if hasattr(env, 'items'):
+    if hasattr(env, "items"):
         env_items = env.items()
     else:
         env_items = env
     if env:
-        for k,v in env_items:
+        for k, v in env_items:
             if not isinstance(k, (bytes, str)):
-                log.error('Environment keys must be strings: %r' % k)
+                log.error("Environment keys must be strings: %r" % k)
             # Check if = is in the key, Required check since we sometimes call ctypes.execve directly
             # https://github.com/python/cpython/blob/025995feadaeebeef5d808f2564f0fd65b704ea5/Modules/posixmodule.c#L6476
-            if b'=' in packing._encode(k):
+            if b"=" in packing._encode(k):
                 log.error('Environment keys may not contain "=": %r' % (k))
             if not isinstance(v, (bytes, str)):
-                log.error('Environment values must be strings: %r=%r' % (k,v))
+                log.error("Environment values must be strings: %r=%r" % (k, v))
             k = packing._need_bytes(k, level, 0x80)  # ASCII text is okay
             v = packing._need_bytes(v, level, 0x80)  # ASCII text is okay
-            if b'\x00' in k[:-1]:
-                log.error('Inappropriate nulls in env key: %r' % (k))
-            if b'\x00' in v[:-1]:
-                log.error('Inappropriate nulls in env value: %r=%r' % (k, v))
-            env2.append((bytearray(k.rstrip(b'\x00')), bytearray(v.rstrip(b'\x00'))))
+            if b"\x00" in k[:-1]:
+                log.error("Inappropriate nulls in env key: %r" % (k))
+            if b"\x00" in v[:-1]:
+                log.error("Inappropriate nulls in env value: %r=%r" % (k, v))
+            env2.append((bytearray(k.rstrip(b"\x00")), bytearray(v.rstrip(b"\x00"))))
 
     return argv, env2 or env
 
@@ -306,103 +306,120 @@ def run_in_new_terminal(command, terminal=None, args=None, kill_at_exit=True, pr
     if not terminal:
         if context.terminal:
             terminal = context.terminal[0]
-            args     = context.terminal[1:]
-        elif which('pwntools-terminal'):
-            terminal = 'pwntools-terminal'
-            args     = []
-        elif 'TMUX' in os.environ and which('tmux'):
-            terminal = 'tmux'
-            args     = ['splitw']
-        elif 'STY' in os.environ and which('screen'):
-            terminal = 'screen'
-            args     = ['-t','pwntools-gdb','bash','-c']
-        elif 'TERM_PROGRAM' in os.environ and os.environ['TERM_PROGRAM'] == "iTerm.app" and which('osascript'):
+            args = context.terminal[1:]
+        elif which("pwntools-terminal"):
+            terminal = "pwntools-terminal"
+            args = []
+        elif "TMUX" in os.environ and which("tmux"):
+            terminal = "tmux"
+            args = ["splitw"]
+        elif "STY" in os.environ and which("screen"):
+            terminal = "screen"
+            args = ["-t", "pwntools-gdb", "bash", "-c"]
+        elif "TERM_PROGRAM" in os.environ and os.environ["TERM_PROGRAM"] == "iTerm.app" and which("osascript"):
             # if we're on a mac, and using iTerm
             terminal = "osascript"
-            args     = []
-        elif 'TERM_PROGRAM' in os.environ and which(os.environ['TERM_PROGRAM']):
-            terminal = os.environ['TERM_PROGRAM']
-            args     = []
-        elif 'DISPLAY' in os.environ and which('x-terminal-emulator'):
-            terminal = 'x-terminal-emulator'
-            args     = ['-e']
-        elif 'KITTY_PID' in os.environ and which('kitty') and which('kitten'):
-            terminal = 'kitten'
-            args = ['@', 'launch']
-        elif 'TERMINATOR_UUID' in os.environ and which('terminator'):
-            if which('remotinator'):
-                terminal = 'remotinator'
-                args = ['vsplit', '-x']
+            args = []
+        elif "TERM_PROGRAM" in os.environ and which(os.environ["TERM_PROGRAM"]):
+            terminal = os.environ["TERM_PROGRAM"]
+            args = []
+        elif "DISPLAY" in os.environ and which("x-terminal-emulator"):
+            terminal = "x-terminal-emulator"
+            args = ["-e"]
+        elif "KITTY_PID" in os.environ and which("kitty") and which("kitten"):
+            terminal = "kitten"
+            args = ["@", "launch"]
+        elif "TERMINATOR_UUID" in os.environ and which("terminator"):
+            if which("remotinator"):
+                terminal = "remotinator"
+                args = ["vsplit", "-x"]
             else:
-                terminal = 'terminator'
-                args = ['-e']
-        elif "GNOME_TERMINAL_SCREEN" in os.environ and "GNOME_TERMINAL_SERVICE" in os.environ and which("gnome-terminal"):
-            terminal = 'gnome-terminal'
-            args     = ['-e']
+                terminal = "terminator"
+                args = ["-e"]
+        elif (
+            "GNOME_TERMINAL_SCREEN" in os.environ and "GNOME_TERMINAL_SERVICE" in os.environ and which("gnome-terminal")
+        ):
+            terminal = "gnome-terminal"
+            args = ["-e"]
         elif "ALACRITTY_SOCKET" in os.environ and "ALACRITTY_WINDOW_ID" in os.environ and which("alacritty"):
-            terminal = 'alacritty'
-            args     = ['-e']
+            terminal = "alacritty"
+            args = ["-e"]
         elif "TILIX_ID" in os.environ and which("tilix"):
             terminal = "tilix"
-            args     = ['-a', 'session-add-right', '-e']
-        elif 'KONSOLE_VERSION' in os.environ and which('qdbus'):
-            qdbus = which('qdbus')
-            window_id = os.environ['WINDOWID']
-            konsole_dbus_service = os.environ['KONSOLE_DBUS_SERVICE']
+            args = ["-a", "session-add-right", "-e"]
+        elif "KONSOLE_VERSION" in os.environ and which("qdbus"):
+            qdbus = which("qdbus")
+            window_id = os.environ["WINDOWID"]
+            konsole_dbus_service = os.environ["KONSOLE_DBUS_SERVICE"]
 
             with subprocess.Popen((qdbus, konsole_dbus_service), stdout=subprocess.PIPE) as proc:
-                lines = proc.communicate()[0].decode().split('\n')
+                lines = proc.communicate()[0].decode().split("\n")
 
             # Iterate over all MainWindows
             for line in lines:
-                parts = line.split('/')
-                if len(parts) == 3 and parts[2].startswith('MainWindow_'):
+                parts = line.split("/")
+                if len(parts) == 3 and parts[2].startswith("MainWindow_"):
                     name = parts[2]
-                    with subprocess.Popen((qdbus, konsole_dbus_service, '/konsole/' + name,
-                                           'org.kde.KMainWindow.winId'), stdout=subprocess.PIPE) as proc:
+                    with subprocess.Popen(
+                        (qdbus, konsole_dbus_service, "/konsole/" + name, "org.kde.KMainWindow.winId"),
+                        stdout=subprocess.PIPE,
+                    ) as proc:
                         target_window_id = proc.communicate()[0].decode().strip()
                         if target_window_id == window_id:
                             break
             else:
-                log.error('MainWindow not found')
+                log.error("MainWindow not found")
 
             # Split
-            subprocess.run((qdbus, konsole_dbus_service, '/konsole/' + name,
-                            'org.kde.KMainWindow.activateAction', 'split-view-left-right'), stdout=subprocess.DEVNULL)
+            subprocess.run(
+                (
+                    qdbus,
+                    konsole_dbus_service,
+                    "/konsole/" + name,
+                    "org.kde.KMainWindow.activateAction",
+                    "split-view-left-right",
+                ),
+                stdout=subprocess.DEVNULL,
+            )
 
             # Find new session
-            with subprocess.Popen((qdbus, konsole_dbus_service, os.environ['KONSOLE_DBUS_WINDOW'],
-                                   'org.kde.konsole.Window.sessionList'), stdout=subprocess.PIPE) as proc:
+            with subprocess.Popen(
+                (qdbus, konsole_dbus_service, os.environ["KONSOLE_DBUS_WINDOW"], "org.kde.konsole.Window.sessionList"),
+                stdout=subprocess.PIPE,
+            ) as proc:
                 session_list = map(int, proc.communicate()[0].decode().split())
             last_konsole_session = max(session_list)
 
-            terminal = 'qdbus'
-            args = [konsole_dbus_service, '/Sessions/{}'.format(last_konsole_session),
-                    'org.kde.konsole.Session.runCommand']
+            terminal = "qdbus"
+            args = [
+                konsole_dbus_service,
+                f"/Sessions/{last_konsole_session}",
+                "org.kde.konsole.Session.runCommand",
+            ]
 
         else:
             is_wsl = False
-            if os.path.exists('/proc/sys/kernel/osrelease'):
-                with open('/proc/sys/kernel/osrelease', 'rb') as f:
-                    is_wsl = b'icrosoft' in f.read()
-            if is_wsl and which('cmd.exe') and which('wsl.exe') and which('bash.exe'):
-                terminal    = 'cmd.exe'
-                args        = ['/c', 'start']
-                distro_name = os.getenv('WSL_DISTRO_NAME')
+            if os.path.exists("/proc/sys/kernel/osrelease"):
+                with open("/proc/sys/kernel/osrelease", "rb") as f:
+                    is_wsl = b"icrosoft" in f.read()
+            if is_wsl and which("cmd.exe") and which("wsl.exe") and which("bash.exe"):
+                terminal = "cmd.exe"
+                args = ["/c", "start"]
+                distro_name = os.getenv("WSL_DISTRO_NAME")
                 current_dir = os.getcwd()
 
                 # Split pane in Windows Terminal
-                if 'WT_SESSION' in os.environ and which('wt.exe'):
-                    args.extend(['wt.exe', '-w', '0', 'split-pane'])
+                if "WT_SESSION" in os.environ and which("wt.exe"):
+                    args.extend(["wt.exe", "-w", "0", "split-pane"])
                 if distro_name:
-                    args.extend(['wsl.exe', '-d', distro_name, '--cd', current_dir, 'bash', '-c'])
+                    args.extend(["wsl.exe", "-d", distro_name, "--cd", current_dir, "bash", "-c"])
                 else:
-                    args.extend(['bash.exe', '-c'])
+                    args.extend(["bash.exe", "-c"])
 
     if not terminal:
-        log.error('Could not find a terminal binary to use. Set context.terminal to your terminal.')
+        log.error("Could not find a terminal binary to use. Set context.terminal to your terminal.")
     elif not which(terminal):
-        log.error('Could not find terminal binary %r. Set context.terminal to your terminal.' % terminal)
+        log.error("Could not find terminal binary %r. Set context.terminal to your terminal." % terminal)
 
     if isinstance(args, tuple):
         args = list(args)
@@ -410,8 +427,8 @@ def run_in_new_terminal(command, terminal=None, args=None, kill_at_exit=True, pr
     # When not specifying context.terminal explicitly, we used to set these flags above.
     # However, if specifying terminal=['tmux', 'splitw', '-h'], we would be lacking these flags.
     # Instead, set them here and hope for the best.
-    if terminal == 'tmux':
-        args += ['-F' '#{pane_pid}', '-P']
+    if terminal == "tmux":
+        args += ["-F#{pane_pid}", "-P"]
 
     if terminal == "kitty":
         if not args:
@@ -422,52 +439,50 @@ def run_in_new_terminal(command, terminal=None, args=None, kill_at_exit=True, pr
         else:
             # Allowing this would make our life much harder (because we don't get the window id from
             # running `kitty`, but we do from `kitten @ launch`) and it's an easy fix for the user.
-            log.error(
-                f"Invalid kitty invocation {context.terminal}, please use `kitten @ launch`.")
-            
+            log.error(f"Invalid kitty invocation {context.terminal}, please use `kitten @ launch`.")
+
     argv = [which(terminal)] + args
 
     if isinstance(command, str):
-        if ';' in command:
+        if ";" in command:
             log.error("Cannot use commands with semicolon.  Create a script and invoke that directly.")
         argv += [command]
     elif isinstance(command, (list, tuple)):
         # Dump the full command line to a temporary file so we can be sure that
         # it is parsed correctly, and we do not need to account for shell expansion
-        script = '''
+        script = """
 #!{executable!s}
 import os
 os.execve({argv0!r}, {argv!r}, os.environ)
-'''
-        script = script.format(executable='/bin/env ' * (' ' in sys.executable) + sys.executable,
-                               argv=command,
-                               argv0=which(command[0]))
+"""
+        script = script.format(
+            executable="/bin/env " * (" " in sys.executable) + sys.executable, argv=command, argv0=which(command[0])
+        )
         script = script.lstrip()
 
         log.debug("Created script for new terminal:\n%s" % script)
 
-        with tempfile.NamedTemporaryFile(delete=False, mode='wt+') as tmp:
-          tmp.write(script)
-          tmp.flush()
-          os.chmod(tmp.name, 0o700)
-          argv += [tmp.name]
-
+        with tempfile.NamedTemporaryFile(delete=False, mode="wt+") as tmp:
+            tmp.write(script)
+            tmp.flush()
+            os.chmod(tmp.name, 0o700)
+            argv += [tmp.name]
 
     # if we're on a Mac and use iTerm, we use `osascript` to split the current window
     # `command` was sanitized on the previous step. It is now either a string, or was written to a tmp file
     # we run the command, which is now `argv[-1]`
-    if terminal == 'osascript':
-        osa_script = """
+    if terminal == "osascript":
+        osa_script = f"""
 tell application "iTerm"
     tell current session of current window
         set newSession to (split horizontally with default profile)
     end tell
     tell newSession
-        write text "{}"
+        write text "{argv[-1]}"
     end tell
 end tell
-""".format(argv[-1])
-        with tempfile.NamedTemporaryFile(delete=False, mode='wt+') as tmp:
+"""
+        with tempfile.NamedTemporaryFile(delete=False, mode="wt+") as tmp:
             tmp.write(osa_script.lstrip())
             tmp.flush()
             os.chmod(tmp.name, 0o700)
@@ -475,20 +490,20 @@ end tell
     # cmd.exe does not support WSL UNC paths as working directory
     # so it gets reset to %WINDIR% before starting wsl again.
     # Set the working directory correctly in WSL.
-    elif terminal == 'cmd.exe':
-        argv[-1] = "cd '{}' && {}".format(os.getcwd(), argv[-1])
+    elif terminal == "cmd.exe":
+        argv[-1] = f"cd '{os.getcwd()}' && {argv[-1]}"
 
     log.debug("Launching a new terminal: %r" % argv)
 
-    stdin = stdout = stderr = open(os.devnull, 'r+b')
-    if terminal == 'tmux' or terminal == 'kitten':
+    stdin = stdout = stderr = open(os.devnull, "r+b")
+    if terminal == "tmux" or terminal == "kitten":
         stdout = subprocess.PIPE
-    if terminal == 'kitten':
+    if terminal == "kitten":
         stderr = subprocess.PIPE
 
     p = subprocess.Popen(argv, stdin=stdin, stdout=stdout, stderr=stderr, preexec_fn=preexec_fn)
 
-    if terminal == 'tmux':
+    if terminal == "tmux":
         out, _ = p.communicate()
         try:
             pid = int(out)
@@ -496,9 +511,16 @@ end tell
             pid = None
         if pid is None:
             log.error("Could not parse PID from tmux output (%r). Start tmux first.", out)
-    elif terminal == 'qdbus':
-        with subprocess.Popen((qdbus, konsole_dbus_service, '/Sessions/{}'.format(last_konsole_session),
-                               'org.kde.konsole.Session.processId'), stdout=subprocess.PIPE) as proc:
+    elif terminal == "qdbus":
+        with subprocess.Popen(
+            (
+                qdbus,
+                konsole_dbus_service,
+                f"/Sessions/{last_konsole_session}",
+                "org.kde.konsole.Session.processId",
+            ),
+            stdout=subprocess.PIPE,
+        ) as proc:
             pid = int(proc.communicate()[0].decode())
     elif terminal == "kitten":
         pid = None
@@ -506,7 +528,9 @@ end tell
 
         # Catch the most common user error
         if b"Remote control is disabled" in err:
-            log.error("Kitty remote control is disabled. Add `allow_remote_control yes` to your ~/.config/kitty/kitty.conf .")
+            log.error(
+                "Kitty remote control is disabled. Add `allow_remote_control yes` to your ~/.config/kitty/kitty.conf ."
+            )
 
         try:
             kittyid = int(out)
@@ -515,22 +539,25 @@ end tell
         if kittyid is None:
             log.error("Could not parse kitty window ID from output (%r) (stderr: %r)", out, err)
         else:
-            lsout, _ = subprocess.Popen(["kitten", "@", "ls", "--match", "id:%d" % kittyid], stdin=stdin, stdout=stdout, stderr=stderr).communicate()
+            lsout, _ = subprocess.Popen(
+                ["kitten", "@", "ls", "--match", "id:%d" % kittyid], stdin=stdin, stdout=stdout, stderr=stderr
+            ).communicate()
             try:
                 lsj = json.loads(lsout)
                 pid = int(lsj[0]["tabs"][0]["windows"][0]["pid"])
             except json.JSONDecodeError as e:
                 pid = None
                 log.error("Json decode failed while parsing 'kitten @ ls' output (%r) (error: %r)", lsout, e)
-            
-    elif terminal == 'cmd.exe':
+
+    elif terminal == "cmd.exe":
         # p.pid is cmd.exe's pid instead of the WSL process we want to start eventually.
         # I don't know how to trace the execution through Windows and back into the WSL2 VM.
         # Do a best guess by waiting for a new process matching the command to be run.
         # Otherwise it's better to return nothing instead of a know wrong pid.
         from pwnlib.util.proc import pid_by_name
+
         pid = None
-        ran_program = command.split(' ')[0] if isinstance(command, str) else command[0]
+        ran_program = command.split(" ")[0] if isinstance(command, str) else command[0]
         t = Timeout()
         with t.countdown(timeout=5):
             while t.timeout:
@@ -543,9 +570,10 @@ end tell
         pid = p.pid
 
     if kill_at_exit and pid:
+
         def kill():
             try:
-                if terminal == 'qdbus':
+                if terminal == "qdbus":
                     os.kill(pid, signal.SIGHUP)
                 else:
                     os.kill(pid, signal.SIGTERM)
@@ -555,6 +583,7 @@ end tell
         atexit.register(kill)
 
     return pid
+
 
 def parse_ldd_output(output):
     """Parses the output from a run of 'ldd' on a binary.
@@ -575,18 +604,19 @@ def parse_ldd_output(output):
         ... ''').keys())
         ['/lib/x86_64-linux-gnu/libc.so.6', '/lib/x86_64-linux-gnu/libdl.so.2', '/lib/x86_64-linux-gnu/libtinfo.so.5', '/lib64/ld-linux-x86-64.so.2']
     """
-    expr_linux   = re.compile(r'\s(?P<lib>\S?/\S+)\s+\((?P<addr>0x.+)\)')
-    expr_openbsd = re.compile(r'^\s+(?P<addr>[0-9a-f]+)\s+[0-9a-f]+\s+\S+\s+[01]\s+[0-9]+\s+[0-9]+\s+(?P<lib>\S+)$')
+    expr_linux = re.compile(r"\s(?P<lib>\S?/\S+)\s+\((?P<addr>0x.+)\)")
+    expr_openbsd = re.compile(r"^\s+(?P<addr>[0-9a-f]+)\s+[0-9a-f]+\s+\S+\s+[01]\s+[0-9]+\s+[0-9]+\s+(?P<lib>\S+)$")
     libs = {}
 
-    for s in output.split('\n'):
+    for s in output.split("\n"):
         match = expr_linux.search(s) or expr_openbsd.search(s)
         if not match:
             continue
-        lib, addr = match.group('lib'), match.group('addr')
+        lib, addr = match.group("lib"), match.group("addr")
         libs[lib] = int(addr, 16)
 
     return libs
+
 
 def mkdir_p(path):
     """Emulates the behavior of ``mkdir -p``."""
@@ -599,22 +629,23 @@ def mkdir_p(path):
         else:
             raise
 
+
 def dealarm_shell(tube):
-    """Given a tube which is a shell, dealarm it.
-    """
+    """Given a tube which is a shell, dealarm it."""
     tube.clean()
 
-    tube.sendline('which python || echo')
-    if tube.recvline().startswith('/'):
+    tube.sendline("which python || echo")
+    if tube.recvline().startswith("/"):
         tube.sendline('''exec python -c "import signal, os; signal.alarm(0); os.execl('$SHELL','')"''')
         return tube
 
-    tube.sendline('which perl || echo')
-    if tube.recvline().startswith('/'):
+    tube.sendline("which perl || echo")
+    if tube.recvline().startswith("/"):
         tube.sendline('''exec perl -e "alarm 0; exec '${SHELL:-/bin/sh}'"''')
         return tube
 
     return None
+
 
 def register_sizes(regs, in_sizes):
     """Create dictionaries over register sizes and relations
@@ -733,9 +764,22 @@ def register_sizes(regs, in_sizes):
     return lists.concat(regs), sizes, bigger, smaller
 
 
-def _create_execve_script(argv=None, executable=None, cwd=None, env=None, ignore_environ=None,
-        stdin=0, stdout=1, stderr=2, preexec_fn=None, preexec_args=(), aslr=None, setuid=None,
-        shell=False, log=log):
+def _create_execve_script(
+    argv=None,
+    executable=None,
+    cwd=None,
+    env=None,
+    ignore_environ=None,
+    stdin=0,
+    stdout=1,
+    stderr=2,
+    preexec_fn=None,
+    preexec_args=(),
+    aslr=None,
+    setuid=None,
+    shell=False,
+    log=log,
+):
     """
     Creates a python wrapper script that triggers the syscall `execve` directly.
 
@@ -782,7 +826,7 @@ def _create_execve_script(argv=None, executable=None, cwd=None, env=None, ignore
     if not argv and not executable:
         log.error("Must specify argv or executable")
 
-    aslr      = aslr if aslr is not None else context.aslr
+    aslr = aslr if aslr is not None else context.aslr
 
     if ignore_environ is None:
         ignore_environ = env is not None  # compat
@@ -791,11 +835,11 @@ def _create_execve_script(argv=None, executable=None, cwd=None, env=None, ignore
 
     if shell:
         if len(argv) != 1:
-            log.error('Cannot provide more than 1 argument if shell=True')
-        argv = [bytearray(b'/bin/sh'), bytearray(b'-c')] + argv
+            log.error("Cannot provide more than 1 argument if shell=True")
+        argv = [bytearray(b"/bin/sh"), bytearray(b"-c")] + argv
 
     executable = executable or argv[0]
-    cwd        = cwd or '.'
+    cwd = cwd or "."
 
     # Validate, since failures on the remote side will suck.
     if not isinstance(executable, (str, bytes, bytearray)):
@@ -803,14 +847,16 @@ def _create_execve_script(argv=None, executable=None, cwd=None, env=None, ignore
     executable = bytearray(packing._need_bytes(executable, min_wrong=0x80))
 
     # Allow passing in sys.stdin/stdout/stderr objects
-    handles = {sys.stdin: 0, sys.stdout:1, sys.stderr:2}
-    stdin  = handles.get(stdin, stdin)
+    handles = {sys.stdin: 0, sys.stdout: 1, sys.stderr: 2}
+    stdin = handles.get(stdin, stdin)
     stdout = handles.get(stdout, stdout)
     stderr = handles.get(stderr, stderr)
 
     # Allow the user to provide a self-contained function to run
-    def func(): pass
-    func      = preexec_fn or func
+    def func():
+        pass
+
+    func = preexec_fn or func
     func_args = preexec_args
 
     if not isinstance(func, types.FunctionType):
@@ -820,9 +866,8 @@ def _create_execve_script(argv=None, executable=None, cwd=None, env=None, ignore
     if func_name == (lambda: 0).__name__:
         log.error("preexec_fn cannot be a lambda")
 
-    func_src  = inspect.getsource(func).strip()
+    func_src = inspect.getsource(func).strip()
     setuid = True if setuid is None else bool(setuid)
-
 
     script = r"""
 #!/usr/bin/env python
@@ -936,10 +981,10 @@ except Exception:
 %(func_src)s
 %(func_name)s(*%(func_args)r)
 
-""" % locals()  
+""" % locals()
 
     if len(argv) > 0 and len(argv[0]) > 0:
-        script += r"os.execve(exe, argv, env) " 
+        script += r"os.execve(exe, argv, env) "
 
     # os.execve does not allow us to pass empty argv[0]
     # Therefore we use ctypes to call execve directly

@@ -1,16 +1,13 @@
-# -*- coding: utf-8 -*-
-"""Abstracting ROP calls
-"""
-from __future__ import division
+"""Abstracting ROP calls"""
+from __future__ import annotations
 
 from pwnlib.abi import ABI
 from pwnlib.context import context
 from pwnlib.util import packing
-
 from pwnlib.util.misc import align
 
 
-class Unresolved(object):
+class Unresolved:
     """
     Encapsulates logic for deferring evaluation of a value used
     in a ROP chain which is in some way self-referential.
@@ -20,6 +17,7 @@ class Unresolved(object):
     the full ROP chain is complete (because the data is appended
     after all of the gadgets).
     """
+
     pass
 
 
@@ -27,6 +25,7 @@ class CurrentStackPointer(Unresolved):
     """
     Unresolved argument which will be replaced with the address of itself.
     """
+
     pass
 
 
@@ -39,6 +38,7 @@ class NextGadgetAddress(Unresolved):
     value, when we wish to continue "execution" of the ROP stack at the
     next gadget.  In particular, SROP needs this.
     """
+
     pass
 
 
@@ -53,6 +53,7 @@ class StackAdjustment(Unresolved):
     arguments), no data is emitted and the ROP will fall-through to the
     next gadget.
     """
+
     pass
 
 
@@ -85,6 +86,7 @@ class AppendedArgument(Unresolved):
         >>> u.resolve()
         [1008, 1016, 1024, 1032, 1040, 1048, 1056, 1064, b'pointers!\x00$$$$$$']
     """
+
     #: Symbolic name of the value.
     name = None
 
@@ -103,7 +105,7 @@ class AppendedArgument(Unresolved):
     #: When modified, updates recursively.
     address = 0
 
-    def __init__(self, value, address = 0):
+    def __init__(self, value, address=0):
         if not isinstance(value, (list, tuple)):
             value = [value]
         self.values = []
@@ -116,7 +118,7 @@ class AppendedArgument(Unresolved):
                     v = packing._need_bytes(v)
                 try:
                     self.size += align(context.bytes, len(v))
-                except TypeError: # no 'len'
+                except TypeError:  # no 'len'
                     self.size += context.bytes
         for v in value:
             if isinstance(v, (list, tuple)):
@@ -145,8 +147,7 @@ class AppendedArgument(Unresolved):
     def local(self, address):
         original = self.address
 
-        class LocalAddress(object):
-
+        class LocalAddress:
             def __enter__(*a, **kw):
                 self.address = address
 
@@ -175,9 +176,9 @@ class AppendedArgument(Unresolved):
                 elif isinstance(value, str):
                     value = packing._need_bytes(value)
                 if isinstance(value, (bytes, bytearray)):
-                    value += b'\x00'
+                    value += b"\x00"
                     while len(value) % context.bytes:
-                        value += b'$'
+                        value += b"$"
 
                     rv[i] = value
                 elif isinstance(value, Unresolved):
@@ -195,12 +196,12 @@ class AppendedArgument(Unresolved):
 
     def __repr__(self):
         if isinstance(self.address, int):
-            return '%s(%r, %#x)' % (self.__class__.__name__, self.values, self.address)
+            return "%s(%r, %#x)" % (self.__class__.__name__, self.values, self.address)
         else:
-            return '%s(%r, %r)' % (self.__class__.__name__, self.values, self.address)
+            return "%s(%r, %r)" % (self.__class__.__name__, self.values, self.address)
 
 
-class Call(object):
+class Call:
     """
     Encapsulates ABI-agnostic information about a function call, which is
     to be executed with ROP.
@@ -214,6 +215,7 @@ class Call(object):
         >>> Call('system', 0xdeadbeef, [1, 2, b'/bin/sh'])
         Call('system', 0xdeadbeef, [1, 2, AppendedArgument([b'/bin/sh'], 0x0)])
     """
+
     #: Pretty name of the call target, e.g. 'system'
     name = None
 
@@ -226,7 +228,7 @@ class Call(object):
     def __init__(self, name, target, args, abi=None, before=()):
         assert isinstance(name, (bytes, str))
         assert isinstance(args, (list, tuple))
-        self.abi  = abi or ABI.default()
+        self.abi = abi or ABI.default()
         self.name = name
         self.target = target
         self.args = list(args)
@@ -237,10 +239,7 @@ class Call(object):
 
     def __repr__(self):
         fmt = "%#x" if isinstance(self.target, int) else "%r"
-        return '%s(%r, %s, %r)' % (self.__class__.__name__,
-                                    self.name,
-                                    fmt % self.target,
-                                    self.args)
+        return "%s(%r, %s, %r)" % (self.__class__.__name__, self.name, fmt % self.target, self.args)
 
     def is_flat(self):
         if isinstance(self, (int, Unresolved)):
@@ -255,7 +254,7 @@ class Call(object):
 
     @property
     def stack_arguments(self):
-        return self.args[len(self.abi.register_arguments):]
+        return self.args[len(self.abi.register_arguments) :]
 
     @classmethod
     def _special_repr(cls, x):
@@ -279,4 +278,4 @@ class Call(object):
                 arg_str.append(hex(arg))
             else:
                 arg_str.append(str(arg))
-        return '%s(%s)' % (name, ', '.join(arg_str))
+        return "%s(%s)" % (name, ", ".join(arg_str))

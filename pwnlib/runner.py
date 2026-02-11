@@ -1,15 +1,13 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
-import os
 import sys
-import tempfile
 
 from pwnlib.context import LocalContext, context
 from pwnlib.elf import ELF
 from pwnlib.tubes.process import process
 
-__all__ = ['run_assembly', 'run_shellcode', 'run_assembly_exitcode', 'run_shellcode_exitcode']
+__all__ = ["run_assembly", "run_shellcode", "run_assembly_exitcode", "run_shellcode_exitcode"]
+
 
 @LocalContext
 def run_assembly(assembly):
@@ -32,15 +30,19 @@ def run_assembly(assembly):
         >>> p.poll()
         12
     """
-    if context.os == 'darwin':
-        if sys.platform != 'darwin':
-            raise ValueError('Running Mach-O only supported on Darwin machines. Please use:\n'
-                             '- https://github.com/MatthewCroughan/NixThePlanet\n'
-                             '- https://github.com/sickcodes/Docker-OSX')
+    if context.os == "darwin":
+        if sys.platform != "darwin":
+            raise ValueError(
+                "Running Mach-O only supported on Darwin machines. Please use:\n"
+                "- https://github.com/MatthewCroughan/NixThePlanet\n"
+                "- https://github.com/sickcodes/Docker-OSX"
+            )
         from pwnlib.asm import make_macho_from_assembly
+
         return process(make_macho_from_assembly(assembly))
 
     return ELF.from_assembly(assembly).process()
+
 
 @LocalContext
 def run_shellcode(bytes, **kw):
@@ -60,15 +62,19 @@ def run_shellcode(bytes, **kw):
         >>> p.poll()
         12
     """
-    if context.os == 'darwin':
-        if sys.platform != 'darwin':
-            raise ValueError('Running Mach-O only supported on Darwin machines. Please use:\n'
-                             '- https://github.com/MatthewCroughan/NixThePlanet\n'
-                             '- https://github.com/sickcodes/Docker-OSX')
+    if context.os == "darwin":
+        if sys.platform != "darwin":
+            raise ValueError(
+                "Running Mach-O only supported on Darwin machines. Please use:\n"
+                "- https://github.com/MatthewCroughan/NixThePlanet\n"
+                "- https://github.com/sickcodes/Docker-OSX"
+            )
         from pwnlib.asm import make_macho
+
         return process(make_macho(bytes))
 
     return ELF.from_bytes(bytes, **kw).process()
+
 
 @LocalContext
 def run_assembly_exitcode(assembly):
@@ -88,6 +94,7 @@ def run_assembly_exitcode(assembly):
     p = run_assembly(assembly)
     p.wait_for_close()
     return p.poll()
+
 
 @LocalContext
 def run_shellcode_exitcode(bytes):

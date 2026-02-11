@@ -1,21 +1,22 @@
 """
 Just a lot of spinners!
 """
+from __future__ import annotations
 
 from pwn import *
 
 context.log_level = 0
 
 n = 1
-h = log.waitfor('spinners running', status = str(n))
+h = log.waitfor("spinners running", status=str(n))
 
 hs = []
 print('type "q" to quit')
 while True:
-    s = str_input('> ').strip()
-    if s == 'q':
+    s = str_input("> ").strip()
+    if s == "q":
         break
-    hs.append(log.waitfor(s, status = 'running'))
+    hs.append(log.waitfor(s, status="running"))
     n += 1
     h.status(str(n))
 

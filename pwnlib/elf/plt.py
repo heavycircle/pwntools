@@ -1,12 +1,11 @@
-"""Emulates instructions in the PLT to locate symbols more accurately.
-"""
-from __future__ import division
+"""Emulates instructions in the PLT to locate symbols more accurately."""
+from __future__ import annotations
+
 import logging
 
 from pwnlib.args import args
 from pwnlib.log import getLogger
-from pwnlib.util import fiddling
-from pwnlib.util import packing
+from pwnlib.util import fiddling, packing
 
 log = getLogger(__name__)
 
@@ -31,9 +30,9 @@ def emulate_plt_instructions(elf, got, address, data, targets):
         log.setLevel(logging.DEBUG + 1)
 
     # Unicorn doesn't support big-endian for everything yet.
-    if elf.endian == 'big' and elf.arch == 'mips':
-        data = packing.unpack_many(data, bits=32, endian='little')
-        data = packing.flat(data, bits=32, endian='big')
+    if elf.endian == "big" and elf.arch == "mips":
+        data = packing.unpack_many(data, bits=32, endian="little")
+        data = packing.flat(data, bits=32, endian="big")
 
     uc, ctx = prepare_unicorn_and_context(elf, got, address, data)
 
@@ -41,11 +40,11 @@ def emulate_plt_instructions(elf, got, address, data, targets):
     # Do not emulate more than a handful of instructions.
     for i, pc in enumerate(range(address, address + len(data), 4)):
         if log.isEnabledFor(logging.DEBUG):
-            log.debug('%s %#x', fiddling.enhex(data[i*4:(i+1) * 4]), pc)
+            log.debug("%s %#x", fiddling.enhex(data[i * 4 : (i + 1) * 4]), pc)
             log.debug(elf.disasm(pc, 4))
 
         uc.context_restore(ctx)
-        target = emulate_plt_instructions_inner(uc, elf, got, pc, data[i*4:])
+        target = emulate_plt_instructions_inner(uc, elf, got, pc, data[i * 4 :])
 
         if target in targets:
             log.debug("%#x -> %#x", pc, target)
@@ -62,11 +61,9 @@ def __ensure_memory_to_run_unicorn():
     This is a bug in Unicorn Engine, see: https://github.com/unicorn-engine/unicorn/issues/1766
     """
     try:
-        from mmap import mmap, MAP_ANON, MAP_PRIVATE, PROT_EXEC, PROT_READ, PROT_WRITE
+        from mmap import MAP_ANON, MAP_PRIVATE, PROT_EXEC, PROT_READ, PROT_WRITE, mmap
 
-        mm = mmap(
-            -1, 1024 * 1024 * 1024, MAP_PRIVATE | MAP_ANON, PROT_WRITE | PROT_READ
-        )
+        mm = mmap(-1, 1024 * 1024 * 1024, MAP_PRIVATE | MAP_ANON, PROT_WRITE | PROT_READ)
         mm.close()
     except OSError:
         raise OSError("Cannot allocate 1GB memory to run Unicorn Engine")
@@ -83,16 +80,16 @@ def prepare_unicorn_and_context(elf, got, address, data):
     # Instantiate the emulator with the correct arguments for the current
     # architecutre.
     arch = {
-        'aarch64': U.UC_ARCH_ARM64,
-        'amd64': U.UC_ARCH_X86,
-        'arm': U.UC_ARCH_ARM,
-        'i386': U.UC_ARCH_X86,
-        'mips': U.UC_ARCH_MIPS,
-        'mips64': U.UC_ARCH_MIPS,
+        "aarch64": U.UC_ARCH_ARM64,
+        "amd64": U.UC_ARCH_X86,
+        "arm": U.UC_ARCH_ARM,
+        "i386": U.UC_ARCH_X86,
+        "mips": U.UC_ARCH_MIPS,
+        "mips64": U.UC_ARCH_MIPS,
         # 'powerpc': U.UC_ARCH_PPC, <-- Not actually supported
-        'thumb': U.UC_ARCH_ARM,
-        'riscv32': U.UC_ARCH_RISCV,
-        'riscv64': U.UC_ARCH_RISCV,
+        "thumb": U.UC_ARCH_ARM,
+        "riscv32": U.UC_ARCH_RISCV,
+        "riscv64": U.UC_ARCH_RISCV,
         # 'loongarch64': U.UC_ARCH_LOONGARCH, <-- Not actually supported
     }.get(elf.arch, None)
 
@@ -104,27 +101,24 @@ def prepare_unicorn_and_context(elf, got, address, data):
 
     # x32 uses 64-bit instructions, just restricts itself to a 32-bit
     # address space.
-    if elf.arch == 'amd64' and elf.bits == 32:
+    if elf.arch == "amd64" and elf.bits == 32:
         emulation_bits = 64
 
-    mode = {
-        32: U.UC_MODE_32,
-        64: U.UC_MODE_64
-    }.get(emulation_bits)
+    mode = {32: U.UC_MODE_32, 64: U.UC_MODE_64}.get(emulation_bits)
 
-    if elf.arch in ('arm', 'aarch64'):
+    if elf.arch in ("arm", "aarch64"):
         mode = U.UC_MODE_ARM
 
     uc = U.Uc(arch, mode)
 
     # Map the page of memory, and fill it with the contents
-    start = address & (~0xfff)
-    stop  = (address + len(data) + 0xfff) & (~0xfff)
+    start = address & (~0xFFF)
+    stop = (address + len(data) + 0xFFF) & (~0xFFF)
 
     if not (0 <= start <= stop <= (1 << elf.bits)):
         return None
 
-    uc.mem_map(start, stop-start)
+    uc.mem_map(start, stop - start)
     uc.mem_write(address, data)
     assert uc.mem_read(address, len(data)) == data
 
@@ -133,12 +127,12 @@ def prepare_unicorn_and_context(elf, got, address, data):
     # Because of this, we have to support loading memory from this location.
     #
     # https://www.cr0.org/paper/mips.elf.external.resolution.txt
-    magic_addr = 0x7c7c7c7c
+    magic_addr = 0x7C7C7C7C
 
-    if elf.arch == 'mips':
+    if elf.arch == "mips":
         # Map the GOT so that MIPS can access it
         p_magic = packing.p32(magic_addr)
-        start = got & (~0xfff)
+        start = got & (~0xFFF)
         try:
             uc.mem_map(start, 0x1000)
         except Exception:
@@ -157,12 +151,12 @@ def emulate_plt_instructions_inner(uc, elf, got, pc, data):
     stopped_addr = []
 
     # For MIPS. Explanation at prepare_unicorn_and_context.
-    magic_addr = 0x7c7c7c7c
+    magic_addr = 0x7C7C7C7C
 
     def hook_mem(uc, access, address, size, value, user_data):
         # Special case to allow MIPS to dereference the _DYNAMIC pointer
         # in the GOT.
-        if elf.arch == 'mips' and address == got:
+        if elf.arch == "mips" and address == got:
             return True
 
         user_data.append(address)
@@ -181,24 +175,22 @@ def emulate_plt_instructions_inner(uc, elf, got, pc, data):
     # hooks.append(uc.hook_add(U.UC_HOOK_CODE, hook_code))
 
     # For Intel, set the value of EBX
-    if elf.arch == 'i386':
+    if elf.arch == "i386":
         uc.reg_write(U.x86_const.UC_X86_REG_EBX, got)
 
     # Special case for MIPS, which is the most silly architecture
     # https://sourceware.org/ml/binutils/2004-11/msg00116.html
-    if elf.arch == 'mips' and elf.bits == 32:
-        OFFSET_GP_GOT = 0x7ff0
-        uc.reg_write(U.mips_const.UC_MIPS_REG_GP, got + 0x7ff0)
+    if elf.arch == "mips" and elf.bits == 32:
+        OFFSET_GP_GOT = 0x7FF0
+        uc.reg_write(U.mips_const.UC_MIPS_REG_GP, got + 0x7FF0)
 
     try:
         uc.emu_start(pc, until=-1, count=5)
     except U.UcError as error:
-        UC_ERR = next(k for k,v in \
-                    U.unicorn_const.__dict__.items()
-                    if error.errno == v and k.startswith('UC_ERR_'))
+        UC_ERR = next(k for k, v in U.unicorn_const.__dict__.items() if error.errno == v and k.startswith("UC_ERR_"))
         log.debug("%#x: %s (%s)", pc, error, UC_ERR)
 
-    if elf.arch == 'mips':
+    if elf.arch == "mips":
         pc = uc.reg_read(U.mips_const.UC_MIPS_REG_PC)
         if pc == magic_addr:
             t8 = uc.reg_read(U.mips_const.UC_MIPS_REG_T8)

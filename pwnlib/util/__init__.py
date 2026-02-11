@@ -1,7 +1,3 @@
-from __future__ import absolute_import
+from __future__ import annotations
 
-__all__ = [
-    'crc', 'cyclic', 'fiddling', 'hashes', 'iters',
-    'lists', 'misc', 'net', 'packing', 'proc', 'safeeval',
-    'web'
-]
+__all__ = ["crc", "cyclic", "fiddling", "hashes", "iters", "lists", "misc", "net", "packing", "proc", "safeeval", "web"]

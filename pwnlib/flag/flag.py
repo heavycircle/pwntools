@@ -1,7 +1,6 @@
-"""Describes a way to submit a key to a key server.
-"""
-from __future__ import absolute_import
-from __future__ import division
+"""Describes a way to submit a key to a key server."""
+
+from __future__ import annotations
 
 import os
 
@@ -9,21 +8,19 @@ from pwnlib.args import args
 from pwnlib.log import getLogger
 from pwnlib.tubes.remote import remote
 
-env_server  = args.get('FLAG_HOST', 'flag-submission-server').strip()
-env_port    = args.get('FLAG_PORT', '31337').strip()
-env_file    = args.get('FLAG_FILE', '/does/not/exist').strip()
-env_exploit_name = args.get('EXPLOIT_NAME', 'unnamed-exploit').strip()
-env_target_host  = args.get('TARGET_HOST', 'unknown-target').strip()
-env_team_name    = args.get('TEAM_NAME', 'unknown-team').strip()
+env_server = args.get("FLAG_HOST", "flag-submission-server").strip()
+env_port = args.get("FLAG_PORT", "31337").strip()
+env_file = args.get("FLAG_FILE", "/does/not/exist").strip()
+env_exploit_name = args.get("EXPLOIT_NAME", "unnamed-exploit").strip()
+env_target_host = args.get("TARGET_HOST", "unknown-target").strip()
+env_team_name = args.get("TEAM_NAME", "unknown-team").strip()
 
 log = getLogger(__name__)
 
-def submit_flag(flag,
-                exploit=env_exploit_name,
-                target=env_target_host,
-                server=env_server,
-                port=env_port,
-                team=env_team_name):
+
+def submit_flag(
+    flag, exploit=env_exploit_name, target=env_target_host, server=env_server, port=env_port, team=env_team_name
+):
     """
     Submits a flag to the game server
 
@@ -54,11 +51,7 @@ def submit_flag(flag,
 
     log.success("Flag: %r" % flag)
 
-    data = "\n".join([flag,
-                      exploit,
-                      target,
-                      team,
-                      '']).encode('ascii')
+    data = "\n".join([flag, exploit, target, team, ""]).encode("ascii")
 
     if os.path.exists(env_file):
         write(env_file, data)

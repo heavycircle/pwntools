@@ -1,28 +1,20 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import base64
 import binascii
 import random
 import re
-import os
 import string
-
 from io import BytesIO
 
-from pwnlib.context import LocalNoarchContext
-from pwnlib.context import context
+from pwnlib.context import LocalNoarchContext, context
 from pwnlib.log import getLogger
 from pwnlib.term import text
-from pwnlib.util import iters
-from pwnlib.util import lists
-from pwnlib.util import packing
-from pwnlib.util.cyclic import cyclic
+from pwnlib.util import iters, lists, packing
 from pwnlib.util.cyclic import de_bruijn
-from pwnlib.util.cyclic import cyclic_find
 
 log = getLogger(__name__)
+
 
 def unhex(s):
     r"""unhex(s) -> str
@@ -41,10 +33,11 @@ def unhex(s):
     s = s.strip()
     if len(s) % 2 != 0:
         if isinstance(s, (bytes, bytearray)):
-            s = b'0' + s
+            s = b"0" + s
         else:
-            s = '0' + s
+            s = "0" + s
     return binascii.unhexlify(s)
+
 
 def enhex(x):
     """enhex(x) -> str
@@ -57,9 +50,10 @@ def enhex(x):
         '74657374'
     """
     x = binascii.hexlify(x)
-    if not hasattr(x, 'encode'):
-        x = x.decode('ascii')
+    if not hasattr(x, "encode"):
+        x = x.decode("ascii")
     return x
+
 
 def urlencode(s):
     """urlencode(s) -> str
@@ -71,9 +65,10 @@ def urlencode(s):
         >>> urlencode("test")
         '%74%65%73%74'
     """
-    return ''.join(['%%%02x' % ord(c) for c in s])
+    return "".join(["%%%02x" % ord(c) for c in s])
 
-def urldecode(s, ignore_invalid = False):
+
+def urldecode(s, ignore_invalid=False):
     """urldecode(s, ignore_invalid = False) -> str
 
     URL-decodes a string.
@@ -89,25 +84,26 @@ def urldecode(s, ignore_invalid = False):
         >>> urldecode("%qq", ignore_invalid = True)
         '%qq'
     """
-    res = ''
+    res = ""
     n = 0
     while n < len(s):
-        if s[n] != '%':
+        if s[n] != "%":
             res += s[n]
             n += 1
         else:
-            cur = s[n+1:n+3]
-            if re.match('[0-9a-fA-F]{2}', cur):
+            cur = s[n + 1 : n + 3]
+            if re.match("[0-9a-fA-F]{2}", cur):
                 res += chr(int(cur, 16))
                 n += 3
             elif ignore_invalid:
-                res += '%'
+                res += "%"
                 n += 1
             else:
                 raise ValueError("Invalid input to urldecode")
     return res
 
-def bits(s, endian = 'big', zero = 0, one = 1):
+
+def bits(s, endian="big", zero=0, one=1):
     """bits(s, endian = 'big', zero = 0, one = 1) -> list
 
     Converts the argument into a list of bits.
@@ -131,10 +127,10 @@ def bits(s, endian = 'big', zero = 0, one = 1):
         [0, 0, 0, 0, 0, 0, 0, 0]
     """
 
-    if endian not in ['little', 'big']:
+    if endian not in ["little", "big"]:
         raise ValueError("bits(): 'endian' must be either 'little' or 'big'")
     else:
-        little = endian == 'little'
+        little = endian == "little"
 
     out = []
     if isinstance(s, bytes):
@@ -149,7 +145,7 @@ def bits(s, endian = 'big', zero = 0, one = 1):
                 out += byte[::-1]
     elif isinstance(s, int):
         if s < 0:
-            s = s & ((1<<context.bits)-1)
+            s = s & ((1 << context.bits) - 1)
         if s == 0:
             out.append(zero)
         while s:
@@ -164,7 +160,8 @@ def bits(s, endian = 'big', zero = 0, one = 1):
 
     return out
 
-def bits_str(s, endian = 'big', zero = '0', one = '1'):
+
+def bits_str(s, endian="big", zero="0", one="1"):
     """bits_str(s, endian = 'big', zero = '0', one = '1') -> str
 
     A wrapper around :func:`bits`, which converts the output into a string.
@@ -176,9 +173,10 @@ def bits_str(s, endian = 'big', zero = '0', one = '1'):
        >>> bits_str(b"bits_str", endian = "little")
        '0100011010010110001011101100111011111010110011100010111001001110'
     """
-    return ''.join(bits(s, endian, zero, one))
+    return "".join(bits(s, endian, zero, one))
 
-def unbits(s, endian = 'big'):
+
+def unbits(s, endian="big"):
     """unbits(s, endian = 'big') -> str
 
     Converts an iterable of bits into a string.
@@ -199,29 +197,29 @@ def unbits(s, endian = 'big'):
        >>> unbits(bits(b'hello'), endian = 'little')
        b'\\x16\\xa666\\xf6'
     """
-    if endian == 'little':
+    if endian == "little":
         u = lambda s: packing._p8lu(int(s[::-1], 2))
-    elif endian == 'big':
+    elif endian == "big":
         u = lambda s: packing._p8lu(int(s, 2))
     else:
         raise ValueError("unbits(): 'endian' must be either 'little' or 'big'")
 
-    out = b''
-    cur = b''
+    out = b""
+    cur = b""
 
     for c in s:
-        if c in ['1', 1, True]:
-            cur += b'1'
-        elif c in ['0', 0, False]:
-            cur += b'0'
+        if c in ["1", 1, True]:
+            cur += b"1"
+        elif c in ["0", 0, False]:
+            cur += b"0"
         else:
             raise ValueError("unbits(): cannot decode the value %r into a bit" % c)
 
         if len(cur) == 8:
             out += u(cur)
-            cur = b''
+            cur = b""
     if cur:
-        out += u(cur.ljust(8, b'0'))
+        out += u(cur.ljust(8, b"0"))
 
     return out
 
@@ -242,7 +240,8 @@ def bitswap(s):
     for c in s:
         out.append(unbits(bits_str(c)[::-1]))
 
-    return b''.join(out)
+    return b"".join(out)
+
 
 def bitswap_int(n, width):
     """bitswap_int(n) -> int
@@ -268,7 +267,7 @@ def bitswap_int(n, width):
     n &= (1 << width) - 1
 
     # Convert into bits
-    s = bits_str(n, endian = 'little').ljust(width, '0')[:width]
+    s = bits_str(n, endian="little").ljust(width, "0")[:width]
 
     # Convert back
     return int(s, 2)
@@ -283,11 +282,12 @@ def b64e(s):
 
        >>> b64e(b"test")
        'dGVzdA=='
-       """
+    """
     x = base64.b64encode(s)
-    if not hasattr(x, 'encode'):
-        x = x.decode('ascii')
+    if not hasattr(x, "encode"):
+        x = x.decode("ascii")
     return x
+
 
 def b64d(s):
     """b64d(s) -> str
@@ -300,6 +300,7 @@ def b64d(s):
        b'test'
     """
     return base64.b64decode(s)
+
 
 # misc binary functions
 def xor(*args, **kwargs):
@@ -327,7 +328,7 @@ def xor(*args, **kwargs):
        TypeError: xor() got an unexpected keyword argument 'other'
     """
 
-    cut = kwargs.pop('cut', 'max')
+    cut = kwargs.pop("cut", "max")
 
     if kwargs != {}:
         raise TypeError("xor() got an unexpected keyword argument '%s'" % kwargs.popitem()[0])
@@ -335,33 +336,35 @@ def xor(*args, **kwargs):
     if len(args) == 0:
         raise ValueError("Must have something to xor")
 
-    strs = [packing.flat(s, word_size = 8, sign = False, endianness = 'little') for s in args]
+    strs = [packing.flat(s, word_size=8, sign=False, endianness="little") for s in args]
     strs = [bytearray(s) for s in strs if s]
 
     if strs == []:
-        return b''
+        return b""
 
     if isinstance(cut, int):
         cut = cut
-    elif cut == 'left':
+    elif cut == "left":
         cut = len(strs[0])
-    elif cut == 'right':
+    elif cut == "right":
         cut = len(strs[-1])
-    elif cut == 'min':
+    elif cut == "min":
         cut = min(len(s) for s in strs)
-    elif cut == 'max':
+    elif cut == "max":
         cut = max(len(s) for s in strs)
     else:
         raise ValueError("Not a valid argument for 'cut'")
 
     def get(n):
         rv = 0
-        for s in strs: rv ^= s[n%len(s)]
+        for s in strs:
+            rv ^= s[n % len(s)]
         return packing._p8lu(rv)
 
-    return b''.join(map(get, range(cut)))
+    return b"".join(map(get, range(cut)))
 
-def xor_pair(data, avoid = b'\x00\n'):
+
+def xor_pair(data, avoid=b"\x00\n"):
     """xor_pair(data, avoid = '\\x00\\n') -> None or (str, str)
 
     Finds two strings that will xor into a given string, while only
@@ -384,13 +387,13 @@ def xor_pair(data, avoid = b'\x00\n'):
         data = packing.pack(data)
 
     if not isinstance(avoid, (bytes, bytearray)):
-        avoid = avoid.encode('utf-8')
+        avoid = avoid.encode("utf-8")
 
     avoid = bytearray(avoid)
     alphabet = list(packing._p8lu(n) for n in range(256) if n not in avoid)
 
-    res1 = b''
-    res2 = b''
+    res1 = b""
+    res2 = b""
 
     for c1 in bytearray(data):
         if context.randomize:
@@ -406,7 +409,8 @@ def xor_pair(data, avoid = b'\x00\n'):
 
     return res1, res2
 
-def xor_key(data, avoid=b'\x00\n', size=None):
+
+def xor_key(data, avoid=b"\x00\n", size=None):
     r"""xor_key(data, size=None, avoid='\x00\n') -> None or (int, str)
 
     Finds a ``size``-width value that can be XORed with a string
@@ -432,22 +436,22 @@ def xor_key(data, avoid=b'\x00\n', size=None):
     if len(data) % size:
         log.error("Data must be padded to size for xor_key")
 
-    words    = lists.group(size, data)
-    columns  = [b''] * size
+    words = lists.group(size, data)
+    columns = [b""] * size
     for word in words:
-        for i,byte in enumerate(bytearray(word)):
+        for i, byte in enumerate(bytearray(word)):
             columns[i] += bytearray((byte,))
 
     avoid = bytearray(avoid)
     alphabet = bytearray(n for n in range(256) if n not in avoid)
 
-    result = b''
+    result = b""
 
     for column in columns:
         if context.randomize:
             random.shuffle(alphabet)
         for c2 in alphabet:
-            if all(c^c2 in alphabet for c in column):
+            if all(c ^ c2 in alphabet for c in column):
                 result += packing._p8lu(c2)
                 break
         else:
@@ -455,7 +459,8 @@ def xor_key(data, avoid=b'\x00\n', size=None):
 
     return result, xor(data, result)
 
-def randoms(count, alphabet = string.ascii_lowercase):
+
+def randoms(count, alphabet=string.ascii_lowercase):
     """randoms(count, alphabet = string.ascii_lowercase) -> str
 
     Returns a random string of a given length using only the specified alphabet.
@@ -473,10 +478,10 @@ def randoms(count, alphabet = string.ascii_lowercase):
         'evafjilupm'
     """
 
-    return ''.join(random.choice(alphabet) for _ in range(count))
+    return "".join(random.choice(alphabet) for _ in range(count))
 
 
-def rol(n, k, word_size = None):
+def rol(n, k, word_size=None):
     """Returns a rotation by `k` of `n`.
 
     When `n` is a number, then means ``((n << k) | (n >> (word_size - k)))`` truncated to `word_size` bits.
@@ -509,7 +514,7 @@ def rol(n, k, word_size = None):
         raise ValueError("rol(): 'k' must be an integer")
 
     if isinstance(n, (bytes, str, list, tuple)):
-        return n[k % len(n):] + n[:k % len(n)]
+        return n[k % len(n) :] + n[: k % len(n)]
     elif isinstance(n, int):
         k = k % word_size
         n = (n << k) | (n >> (word_size - k))
@@ -519,10 +524,12 @@ def rol(n, k, word_size = None):
     else:
         raise ValueError("rol(): 'n' must be an integer, string, list or tuple")
 
-def ror(n, k, word_size = None):
+
+def ror(n, k, word_size=None):
     """A simple wrapper around :func:`rol`, which negates the values of `k`."""
 
     return rol(n, -k, word_size)
+
 
 def naf(n):
     """naf(int) -> int generator
@@ -550,17 +557,18 @@ def naf(n):
         n = (n - z) // 2
         yield z
 
+
 def isprint(c):
     """isprint(c) -> bool
 
     Return True if a character is printable"""
     if isinstance(c, str):
         c = ord(c)
-    t = bytearray(string.ascii_letters + string.digits + string.punctuation + ' ', 'ascii')
+    t = bytearray(string.ascii_letters + string.digits + string.punctuation + " ", "ascii")
     return c in t
 
 
-def hexii(s, width = 16, skip = True):
+def hexii(s, width=16, skip=True):
     """hexii(s, width = 16, skip = True) -> str
 
     Return a HEXII-dump of a string.
@@ -576,38 +584,44 @@ def hexii(s, width = 16, skip = True):
 
     return hexdump(s, width, skip, True)
 
+
 def _hexiichar(c):
     HEXII = bytearray((string.punctuation + string.digits + string.ascii_letters).encode())
     if c in HEXII:
         return ".%c " % c
     elif c == 0:
         return "   "
-    elif c == 0xff:
+    elif c == 0xFF:
         return "## "
     else:
         return "%02x " % c
 
+
 default_style = {
-    'marker':       text.gray if text.has_gray else text.blue,
-    'nonprintable': text.gray if text.has_gray else text.blue,
-    '00':           text.red,
-    '0a':           text.red,
-    'ff':           text.green,
+    "marker": text.gray if text.has_gray else text.blue,
+    "nonprintable": text.gray if text.has_gray else text.blue,
+    "00": text.red,
+    "0a": text.red,
+    "ff": text.green,
 }
 
-cyclic_pregen = b''
+cyclic_pregen = b""
 de_bruijn_gen = de_bruijn()
 
-def sequential_lines(a,b):
-    return (a+b) in cyclic_pregen
+
+def sequential_lines(a, b):
+    return (a + b) in cyclic_pregen
+
 
 def update_cyclic_pregenerated(size):
     global cyclic_pregen
     while size > len(cyclic_pregen):
         cyclic_pregen += packing._p8lu(next(de_bruijn_gen))
 
-def hexdump_iter(fd, width=16, skip=True, hexii=False, begin=0, style=None,
-                 highlight=None, cyclic=False, groupsize=4, total=True):
+
+def hexdump_iter(
+    fd, width=16, skip=True, hexii=False, begin=0, style=None, highlight=None, cyclic=False, groupsize=4, total=True
+):
     r"""hexdump_iter(s, width = 16, skip = True, hexii = False, begin = 0, style = None,
                     highlight = None, cyclic = False, groupsize=4, total = True) -> str generator
 
@@ -645,7 +659,7 @@ def hexdump_iter(fd, width=16, skip=True, hexii=False, begin=0, style=None,
         00000000  49 20 6b 6e  6f 77 20 6b  75 6e 67 20  66 75        │I kn│ow k│ung │fu│
         0000000e
     """
-    style     = style or {}
+    style = style or {}
     highlight = highlight or []
 
     if groupsize < 1:
@@ -654,33 +668,35 @@ def hexdump_iter(fd, width=16, skip=True, hexii=False, begin=0, style=None,
     for b in highlight:
         if isinstance(b, str):
             b = ord(b)
-        style['%02x' % b] = text.white_on_red
+        style["%02x" % b] = text.white_on_red
     _style = style
     style = default_style.copy()
     style.update(_style)
 
-    skipping    = False
-    lines       = []
-    last_unique = ''
-    byte_width  = len('00 ')
-    spacer      = ' '
-    marker      = (style.get('marker') or (lambda s:s))('│')
+    skipping = False
+    lines = []
+    last_unique = ""
+    byte_width = len("00 ")
+    spacer = " "
+    marker = (style.get("marker") or (lambda s: s))("│")
 
     if not hexii:
+
         def style_byte(by):
-            hbyte = '%02x' % by
+            hbyte = "%02x" % by
             b = packing._p8lu(by)
-            abyte = chr(by) if isprint(b) else '·'
+            abyte = chr(by) if isprint(b) else "·"
             if hbyte in style:
                 st = style[hbyte]
             elif isprint(b):
-                st = style.get('printable')
+                st = style.get("printable")
             else:
-                st = style.get('nonprintable')
+                st = style.get("nonprintable")
             if st:
                 hbyte = st(hbyte)
                 abyte = st(abyte)
             return hbyte, abyte
+
         cache = [style_byte(b) for b in range(256)]
 
     numb = 0
@@ -693,10 +709,10 @@ def hexdump_iter(fd, width=16, skip=True, hexii=False, begin=0, style=None,
         try:
             chunk = fd.read(width)
         except EOFError:
-            chunk = b''
+            chunk = b""
 
         # We have run out of data, exit the loop
-        if chunk == b'':
+        if chunk == b"":
             break
 
         # Advance the cursor by the number of bytes we actually read
@@ -709,15 +725,14 @@ def hexdump_iter(fd, width=16, skip=True, hexii=False, begin=0, style=None,
         # If this chunk is the same as the last unique chunk,
         # use a '*' instead.
         if skip and last_unique:
-            same_as_last_line = (last_unique == chunk)
-            lines_are_sequential = (cyclic and sequential_lines(last_unique, chunk))
+            same_as_last_line = last_unique == chunk
+            lines_are_sequential = cyclic and sequential_lines(last_unique, chunk)
             last_unique = chunk
 
             if same_as_last_line or lines_are_sequential:
-
                 # If we have not already printed a "*", do so
                 if not skipping:
-                    yield '*'
+                    yield "*"
                     skipping = True
 
                 # Move on to the next chunk
@@ -728,50 +743,51 @@ def hexdump_iter(fd, width=16, skip=True, hexii=False, begin=0, style=None,
         last_unique = chunk
 
         # Generate contents for line
-        hexbytes = ''
-        printable = ''
+        hexbytes = ""
+        printable = ""
         color_chars = 0
-        abyte = abyte_previous = ''
+        abyte = abyte_previous = ""
         for i, b in enumerate(bytearray(chunk)):
             if not hexii:
                 abyte_previous = abyte
                 hbyte, abyte = cache[b]
                 color_chars += len(hbyte) - 2
             else:
-                hbyte, abyte = _hexiichar(b), ''
+                hbyte, abyte = _hexiichar(b), ""
 
             if (i + 1) % groupsize == 0 and i < width - 1:
                 hbyte += spacer
                 abyte_previous += abyte
                 abyte = marker
 
-            hexbytes += hbyte + ' '
+            hexbytes += hbyte + " "
             printable += abyte_previous
 
         if abyte != marker:
             printable += abyte
 
-        dividers_per_line = (width // groupsize)
+        dividers_per_line = width // groupsize
         if width % groupsize == 0:
             dividers_per_line -= 1
 
         if hexii:
-            line_fmt = '%%(offset)08x  %%(hexbytes)-%is│' % (width*byte_width)
+            line_fmt = "%%(offset)08x  %%(hexbytes)-%is│" % (width * byte_width)
         else:
-            line_fmt = '%%(offset)08x  %%(hexbytes)-%is │%%(printable)s│' % (
-                 (width * byte_width)
-                + color_chars
-                + dividers_per_line )
+            line_fmt = "%%(offset)08x  %%(hexbytes)-%is │%%(printable)s│" % (
+                (width * byte_width) + color_chars + dividers_per_line
+            )
 
-        line = line_fmt % {'offset': offset, 'hexbytes': hexbytes, 'printable': printable}
+        line = line_fmt % {"offset": offset, "hexbytes": hexbytes, "printable": printable}
         yield line
 
     if total:
         line = "%08x" % (begin + numb)
         yield line
 
-def hexdump(s, width=16, skip=True, hexii=False, begin=0, style=None,
-            highlight=None, cyclic=False, groupsize=4, total=True):
+
+def hexdump(
+    s, width=16, skip=True, hexii=False, begin=0, style=None, highlight=None, cyclic=False, groupsize=4, total=True
+):
     r"""hexdump(s, width = 16, skip = True, hexii = False, begin = 0, style = None,
                 highlight = None, cyclic = False, groupsize=4, total = True) -> str
 
@@ -956,25 +972,18 @@ def hexdump(s, width=16, skip=True, hexii=False, begin=0, style=None,
         00000010  41 41 41 41 41 41 41 41                           │AAAAAAAA│
     """
     s = packing.flat(s, stacklevel=1)
-    return '\n'.join(hexdump_iter(BytesIO(s),
-                                  width,
-                                  skip,
-                                  hexii,
-                                  begin,
-                                  style,
-                                  highlight,
-                                  cyclic,
-                                  groupsize,
-                                  total))
+    return "\n".join(hexdump_iter(BytesIO(s), width, skip, hexii, begin, style, highlight, cyclic, groupsize, total))
 
-def negate(value, width = None):
+
+def negate(value, width=None):
     """
     Returns the two's complement of 'value'.
     """
     if width is None:
         width = context.bits
-    mask = ((1<<width)-1)
-    return ((mask+1) - value) & mask
+    mask = (1 << width) - 1
+    return ((mask + 1) - value) & mask
+
 
 def bnot(value, width=None):
     """
@@ -982,8 +991,9 @@ def bnot(value, width=None):
     """
     if width is None:
         width = context.bits
-    mask = ((1<<width)-1)
+    mask = (1 << width) - 1
     return mask ^ value
+
 
 @LocalNoarchContext
 def js_escape(data, padding=context.cyclic_alphabet[0:1], **kwargs):
@@ -1022,10 +1032,11 @@ def js_escape(data, padding=context.cyclic_alphabet[0:1], **kwargs):
 
     data = bytearray(data)
 
-    if context.endian == 'little':
-        return ''.join('%u{a:02x}{b:02x}'.format(a=a, b=b) for b, a in iters.group(2, data))
+    if context.endian == "little":
+        return "".join(f"%u{a:02x}{b:02x}" for b, a in iters.group(2, data))
     else:
-        return ''.join('%u{a:02x}{b:02x}'.format(a=a, b=b) for a, b in iters.group(2, data))
+        return "".join(f"%u{a:02x}{b:02x}" for a, b in iters.group(2, data))
+
 
 @LocalNoarchContext
 def js_unescape(s, **kwargs):
@@ -1073,30 +1084,31 @@ def js_unescape(s, **kwargs):
     res = []
     p = 0
     while p < len(s):
-        if s[p] == '%':
-            if s[p+1] == "u":
+        if s[p] == "%":
+            if s[p + 1] == "u":
                 # Decode Unicode token e.g. %u4142
-                n = s[p+2:p+6]
+                n = s[p + 2 : p + 6]
                 if len(n) < 4:
-                    raise ValueError('Incomplete Unicode token: %s' % s[p:])
+                    raise ValueError("Incomplete Unicode token: %s" % s[p:])
                 try:
                     n = int(n, 16)
                 except ValueError:
-                    raise ValueError('Failed to decode token: %s' % s[p:p+6])
+                    raise ValueError("Failed to decode token: %s" % s[p : p + 6])
                 res.append(packing.p16(n))
                 p += 6
-            elif s[p+1] in string.hexdigits and s[p+2] in string.hexdigits:
+            elif s[p + 1] in string.hexdigits and s[p + 2] in string.hexdigits:
                 # Decode Non-Unicode token e.g. %E4
-                raise NotImplementedError('Non-Unicode %% tokens are not supported: %s' % s[p:p+3])
+                raise NotImplementedError("Non-Unicode %% tokens are not supported: %s" % s[p : p + 3])
             else:
-                raise ValueError('Bad %% token: %s' % s[p:p+3])
+                raise ValueError("Bad %% token: %s" % s[p : p + 3])
         else:
             res.append(packing.p16(ord(s[p])))
             p += 1
 
-    return b''.join(res)
+    return b"".join(res)
 
-def tty_escape(s, lnext=b'\x16', dangerous=bytes(bytearray(range(0x20)))):
+
+def tty_escape(s, lnext=b"\x16", dangerous=bytes(bytearray(range(0x20)))):
     r"""tty_escape(s, lnext=b'\x16', dangerous=bytes(bytearray(range(0x20)))) -> bytes
 
     Escape data for terminal output. This is useful when sending data to a
@@ -1118,6 +1130,7 @@ def tty_escape(s, lnext=b'\x16', dangerous=bytes(bytearray(range(0x20)))):
     s = s.replace(lnext, lnext * 2)
     for b in bytearray(dangerous):
         b = bytes(bytearray([b]))
-        if b in lnext: continue
+        if b in lnext:
+            continue
         s = s.replace(b, lnext + b)
     return s

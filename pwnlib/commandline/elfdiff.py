@@ -1,13 +1,11 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import shutil
-from argparse import ArgumentParser
-from subprocess import CalledProcessError
-from subprocess import check_output
+from subprocess import CalledProcessError, check_output
 from tempfile import NamedTemporaryFile
 
 import pwnlib.args
+
 pwnlib.args.free_form = False
 
 from pwn import *
@@ -16,24 +14,24 @@ from pwnlib.commandline import common
 
 def dump(objdump, path):
     n = NamedTemporaryFile(delete=False)
-    o = check_output([objdump,'-d','-x','-s',path])
+    o = check_output([objdump, "-d", "-x", "-s", path])
     n.write(o)
     n.flush()
     return n.name
 
-def diff(a,b):
-    try: return check_output(['diff',a,b], universal_newlines=True)
+
+def diff(a, b):
+    try:
+        return check_output(["diff", a, b], universal_newlines=True)
     except CalledProcessError as e:
         return e.output
 
-p = common.parser_commands.add_parser(
-    'elfdiff',
-    help = 'Compare two ELF files',
-    description = 'Compare two ELF files'
-)
 
-p.add_argument('a')
-p.add_argument('b')
+p = common.parser_commands.add_parser("elfdiff", help="Compare two ELF files", description="Compare two ELF files")
+
+p.add_argument("a")
+p.add_argument("b")
+
 
 def main(a):
     with context.silent:
@@ -45,7 +43,7 @@ def main(a):
 
     context.arch = x.arch
 
-    objdump = pwnlib.asm.which_binutils('objdump')
+    objdump = pwnlib.asm.which_binutils("objdump")
 
     tmp = NamedTemporaryFile()
     name = tmp.name
@@ -58,5 +56,6 @@ def main(a):
 
     print(diff(x, y))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     pwnlib.commandline.common.main(__file__, main)

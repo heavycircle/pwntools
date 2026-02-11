@@ -1,5 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import os
 import re
@@ -10,19 +9,23 @@ from pwnlib.term import readline
 class Completer:
     def complete(self, _left, _right):
         raise Exception("unimplemented")
+
     def suggest(self, _left, _right):
         raise Exception("unimplemented")
+
     def __enter__(self):
         self._saved_complete_hook = readline.complete_hook
         self._saved_suggest_hook = readline.suggest_hook
         readline.set_completer(self)
+
     def __exit__(self, *args):
         readline.complete_hook = self._saved_complete_hook
         readline.suggest_hook = self._saved_suggest_hook
 
+
 class WordCompleter(Completer):
-    def __init__(self, delims = None):
-        self.delims = delims or ' \t\n`!@#$^&*()=+[{]}\\|;:\'",<>?'
+    def __init__(self, delims=None):
+        self.delims = delims or " \t\n`!@#$^&*()=+[{]}\\|;:'\",<>?"
         self._cur_word = None
         self._completions = []
 
@@ -47,7 +50,7 @@ class WordCompleter(Completer):
         if len(self._completions) == 1:
             c = self._completions[0]
             if len(c) > len(w):
-                return c[len(w):]
+                return c[len(w) :]
 
     def suggest(self, buffer_left, _buffer_right):
         w = self._get_word(buffer_left)
@@ -57,8 +60,9 @@ class WordCompleter(Completer):
     def complete_word(self, word):
         raise Exception("unimplemented")
 
+
 class LongestPrefixCompleter(WordCompleter):
-    def __init__(self, words = None, delims = None):
+    def __init__(self, words=None, delims=None):
         words = words or []
         WordCompleter.__init__(self, delims)
         self.words = words
@@ -82,11 +86,12 @@ class LongestPrefixCompleter(WordCompleter):
         else:
             return cs
 
+
 class PathCompleter(Completer):
-    def __init__(self, mask = '*', only_dirs = False):
-        if mask != '*':
-            mask = mask.replace('.', '\\.').replace('*', '.*')
-            self.mask = re.compile('^' + mask + '$')
+    def __init__(self, mask="*", only_dirs=False):
+        if mask != "*":
+            mask = mask.replace(".", "\\.").replace("*", ".*")
+            self.mask = re.compile("^" + mask + "$")
         else:
             self.mask = None
         self.only_dirs = only_dirs
@@ -99,8 +104,8 @@ class PathCompleter(Completer):
         if os.path.isabs(prefix):
             path = prefix
         else:
-            path = os.path.join('.', prefix)
-        if os.path.isdir(path) and prefix and prefix[-1] != '/':
+            path = os.path.join(".", prefix)
+        if os.path.isdir(path) and prefix and prefix[-1] != "/":
             self._completions = [prefix]
             return
         dirname = os.path.dirname(path)
@@ -116,9 +121,7 @@ class PathCompleter(Completer):
             if self.only_dirs:
                 cs = [c for c in cs if os.path.isdir(c)]
             if self.mask:
-                cs = [c for c in cs
-                      if self.mask.match(os.path.basename(c))
-                      or os.path.isdir(c)]
+                cs = [c for c in cs if self.mask.match(os.path.basename(c)) or os.path.isdir(c)]
             self._completions = cs
 
     def complete(self, buffer_left, buffer_right):
@@ -126,7 +129,7 @@ class PathCompleter(Completer):
         cs = []
         for c in self._completions:
             if os.path.isdir(c):
-                c += '/'
+                c += "/"
             cs.append(c)
         if not cs:
             return
@@ -139,7 +142,7 @@ class PathCompleter(Completer):
                 break
             lcp += ch
         if len(lcp) > len(buffer_left):
-            return lcp[len(buffer_left):]
+            return lcp[len(buffer_left) :]
 
     def suggest(self, buffer_left, buffer_right):
         self._update(buffer_left)
@@ -147,6 +150,6 @@ class PathCompleter(Completer):
         for c in self._completions:
             b = os.path.basename(c)
             if os.path.isdir(c):
-                b += '/'
+                b += "/"
             out.append(b)
         return out

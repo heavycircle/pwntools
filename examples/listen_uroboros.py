@@ -2,6 +2,7 @@
 An example showing interconnection of sockets.  This script will wait for three
 connections on port 1337, then connect them like a three-way Uroboros.
 """
+from __future__ import annotations
 
 from pwn import *
 

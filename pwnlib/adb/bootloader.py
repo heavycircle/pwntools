@@ -1,8 +1,6 @@
-from __future__ import unicode_literals
-from __future__ import division
+from __future__ import annotations
 
 import ctypes
-import io
 import os
 import sys
 
@@ -10,23 +8,24 @@ from pwnlib.log import getLogger
 
 log = getLogger(__name__)
 
+
 class img_info(ctypes.Structure):
-    _fields_ = [
-        ('name', ctypes.c_char * 64),
-        ('size', ctypes.c_uint32)
-    ]
+    _fields_ = [("name", ctypes.c_char * 64), ("size", ctypes.c_uint32)]
+
 
 class bootloader_images_header(ctypes.Structure):
     _fields_ = [
-        ('magic', ctypes.c_char * 8),
-        ('num_images', ctypes.c_uint32),
-        ('start_offset', ctypes.c_uint32),
-        ('bootldr_size', ctypes.c_uint32),
+        ("magic", ctypes.c_char * 8),
+        ("num_images", ctypes.c_uint32),
+        ("start_offset", ctypes.c_uint32),
+        ("bootldr_size", ctypes.c_uint32),
     ]
 
-BOOTLDR_MAGIC = b'BOOTLDR!'
 
-class BootloaderImage(object):
+BOOTLDR_MAGIC = b"BOOTLDR!"
+
+
+class BootloaderImage:
     def __init__(self, data):
         """Android Bootloader image
 
@@ -39,16 +38,13 @@ class BootloaderImage(object):
         if self.magic != BOOTLDR_MAGIC:
             log.error("Incorrect magic (%r, expected %r)" % (self.magic, BOOTLDR_MAGIC))
 
-        if(self.bootldr_size > len(data)):
-            log.warn_once("Bootloader is supposed to be %#x bytes, only have %#x",
-                          self.bootldr_size,
-                          len(data))
+        if self.bootldr_size > len(data):
+            log.warn_once("Bootloader is supposed to be %#x bytes, only have %#x", self.bootldr_size, len(data))
 
-        if(self.num_images >= 0x100):
+        if self.num_images >= 0x100:
             old = self.num_images
             self.num_images = 1
-            log.warn_once("Bootloader num_images (%#x) appears corrupted, truncating to 1",
-                          old)
+            log.warn_once("Bootloader num_images (%#x) appears corrupted, truncating to 1", old)
 
         imgarray = ctypes.ARRAY(img_info, self.num_images)
         self.img_info = imgarray.from_buffer_copy(data, ctypes.sizeof(self.header))
@@ -82,7 +78,7 @@ class BootloaderImage(object):
         for i in range(index):
             offset += self.img_info[i].size
 
-        return self.data[offset:offset + self.img_info[index].size]
+        return self.data[offset : offset + self.img_info[index].size]
 
     def extract_all(self, path):
         """extract_all(path)
@@ -94,8 +90,8 @@ class BootloaderImage(object):
             raise ValueError("%r does not exist or is not a directory" % path)
 
         for img in self.img_info:
-            imgpath = os.path.join(path, img.name + '.img')
-            with open(imgpath, 'wb+') as f:
+            imgpath = os.path.join(path, img.name + ".img")
+            with open(imgpath, "wb+") as f:
                 data = self.extract(img.name)
                 f.write(data)
 
@@ -110,16 +106,16 @@ class BootloaderImage(object):
             rv.append("    Name: %s" % img.name)
             rv.append("    Size: %#x" % img.size)
             rv.append("    Data: %r..." % self.extract(img.name)[:32])
-        return '\n'.join(rv)
+        return "\n".join(rv)
 
     def __getattr__(self, name):
-        if name.startswith('_'):
+        if name.startswith("_"):
             raise AttributeError(name)
 
         return getattr(self.header, name)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Easy sanity checking
-    b = BootloaderImage(open(sys.argv[1], 'rb').read())
+    b = BootloaderImage(open(sys.argv[1], "rb").read())
     print(b)

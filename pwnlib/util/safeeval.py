@@ -1,25 +1,56 @@
-from __future__ import division
+from __future__ import annotations
 
 _const_codes = [
-    'POP_TOP','ROT_TWO','ROT_THREE','ROT_FOUR','DUP_TOP',
-    'BUILD_LIST','BUILD_MAP', 'MAP_ADD', 'BUILD_TUPLE','BUILD_SET',
-    'BUILD_CONST_KEY_MAP', 'BUILD_STRING',
-    'LOAD_CONST','LOAD_SMALL_INT','RETURN_VALUE','STORE_SUBSCR', 'STORE_MAP',
-    'LIST_TO_TUPLE', 'LIST_EXTEND', 'SET_UPDATE', 'DICT_UPDATE', 'DICT_MERGE',
-    'COPY', 'RESUME', 'RETURN_CONST'
-    ]
+    "POP_TOP",
+    "ROT_TWO",
+    "ROT_THREE",
+    "ROT_FOUR",
+    "DUP_TOP",
+    "BUILD_LIST",
+    "BUILD_MAP",
+    "MAP_ADD",
+    "BUILD_TUPLE",
+    "BUILD_SET",
+    "BUILD_CONST_KEY_MAP",
+    "BUILD_STRING",
+    "LOAD_CONST",
+    "LOAD_SMALL_INT",
+    "RETURN_VALUE",
+    "STORE_SUBSCR",
+    "STORE_MAP",
+    "LIST_TO_TUPLE",
+    "LIST_EXTEND",
+    "SET_UPDATE",
+    "DICT_UPDATE",
+    "DICT_MERGE",
+    "COPY",
+    "RESUME",
+    "RETURN_CONST",
+]
 
 _expr_codes = _const_codes + [
-    'UNARY_POSITIVE','UNARY_NEGATIVE','UNARY_NOT',
-    'UNARY_INVERT','BINARY_POWER','BINARY_MULTIPLY',
-    'BINARY_DIVIDE','BINARY_FLOOR_DIVIDE','BINARY_TRUE_DIVIDE',
-    'BINARY_MODULO','BINARY_ADD','BINARY_SUBTRACT',
-    'BINARY_LSHIFT','BINARY_RSHIFT','BINARY_AND','BINARY_XOR',
-    'BINARY_OR',
-    'BINARY_OP',
-    ]
+    "UNARY_POSITIVE",
+    "UNARY_NEGATIVE",
+    "UNARY_NOT",
+    "UNARY_INVERT",
+    "BINARY_POWER",
+    "BINARY_MULTIPLY",
+    "BINARY_DIVIDE",
+    "BINARY_FLOOR_DIVIDE",
+    "BINARY_TRUE_DIVIDE",
+    "BINARY_MODULO",
+    "BINARY_ADD",
+    "BINARY_SUBTRACT",
+    "BINARY_LSHIFT",
+    "BINARY_RSHIFT",
+    "BINARY_AND",
+    "BINARY_XOR",
+    "BINARY_OR",
+    "BINARY_OP",
+]
 
-_values_codes = _expr_codes + ['LOAD_NAME']
+_values_codes = _expr_codes + ["LOAD_NAME"]
+
 
 def _get_opcodes(codeobj):
     """_get_opcodes(codeobj) -> [opcodes]
@@ -31,7 +62,9 @@ def _get_opcodes(codeobj):
     [...100, 100, 103, 83]
     """
     import dis
+
     return [ins.opcode for ins in dis.get_instructions(codeobj)]
+
 
 def test_expr(expr, allowed_codes):
     """test_expr(expr, allowed_codes) -> codeobj
@@ -41,6 +74,7 @@ def test_expr(expr, allowed_codes):
     return the compiled code object. Otherwise raise a ValueError
     """
     import dis
+
     allowed_codes = [dis.opmap[c] for c in allowed_codes if c in dis.opmap]
     try:
         c = compile(expr, "", "eval")
@@ -51,6 +85,7 @@ def test_expr(expr, allowed_codes):
         if code not in allowed_codes:
             raise ValueError("opcode %s not allowed" % dis.opname[code])
     return c
+
 
 def const(expr):
     """const(expression) -> value
@@ -76,6 +111,7 @@ def const(expr):
     c = test_expr(expr, _const_codes)
     return eval(c)
 
+
 def expr(expr):
     """expr(expression) -> value
 
@@ -99,6 +135,7 @@ def expr(expr):
 
     c = test_expr(expr, _expr_codes)
     return eval(c)
+
 
 def values(expr, env):
     """values(expression, dict) -> value
@@ -131,7 +168,7 @@ def values(expr, env):
     env = dict(env)
 
     # We do not want to have built-ins set
-    env['__builtins__'] = {}
+    env["__builtins__"] = {}
 
     c = test_expr(expr, _values_codes)
     return eval(c, env)

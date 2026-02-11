@@ -41,9 +41,11 @@ which documents the module.
     'bar'
 
 """
+from __future__ import annotations
+
 
 def add(a, b):
-    '''add(a, b) -> int
+    """add(a, b) -> int
 
     Adds the numbers ``a`` and ``b``.
 
@@ -60,5 +62,5 @@ def add(a, b):
         3
         >>> add(-1, 33)
         32
-    '''
-    return a+b
+    """
+    return a + b

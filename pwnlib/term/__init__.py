@@ -1,15 +1,8 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import sys
 
-from pwnlib.term import completer
-from pwnlib.term import key
-from pwnlib.term import keymap
-from pwnlib.term import readline
-from pwnlib.term import term
-from pwnlib.term import termcap
-from pwnlib.term import text
+from pwnlib.term import completer, key, keymap, readline, term, termcap, text
 
 # Re-exports (XXX: Are these needed?)
 term.update_geometry()
@@ -22,13 +15,14 @@ Keymap = keymap.Keymap
 #: This is True exactly when we have taken over the terminal using :func:`init`.
 term_mode = False
 
+
 def can_init():
     """This function returns True iff stderr is a TTY and we are not inside a
     REPL.  Iff this function returns `True`, a call to :meth:`init` will let
     ``pwnlib`` manage the terminal.
     """
 
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         return False
 
     if not sys.stdout.isatty():
@@ -40,7 +34,7 @@ def can_init():
 
     # Check fancy REPLs
     mods = sys.modules.keys()
-    for repl in ['IPython', 'bpython', 'dreampielib', 'jupyter_client._version']:
+    for repl in ["IPython", "bpython", "dreampielib", "jupyter_client._version"]:
         if repl in mods:
             return False
 
@@ -53,7 +47,7 @@ def can_init():
         frame = sys.exc_info()[2].tb_frame
 
     while frame:
-        if frame.f_code.co_filename == '<stdin>':
+        if frame.f_code.co_filename == "<stdin>":
             return False
         frame = frame.f_back
 
@@ -77,13 +71,15 @@ def init():
         return
 
     term.init()
+
     def update_geometry():
         global height, width
         height = term.height
         width = term.width
+
     update_geometry()
     term.on_winch.append(update_geometry)
     readline.init()
 
     term_mode = True
-    text.num_colors = termcap.get('colors', default = 8) or 8
+    text.num_colors = termcap.get("colors", default=8) or 8

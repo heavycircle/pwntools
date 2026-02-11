@@ -45,8 +45,8 @@ the :mod:`pwnlib.adb` module.
     adb.write('/data/local/tmp/foo', 'my data')
 
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import functools
 import glob
@@ -60,18 +60,17 @@ import time
 
 import dateutil.parser
 
-from pwnlib import atexit
-from pwnlib import tubes
-from pwnlib.context import LocalContext
-from pwnlib.context import context
+from pwnlib import atexit, tubes
+from pwnlib.context import LocalContext, context
 from pwnlib.device import Device
 from pwnlib.exception import PwnlibException
 from pwnlib.log import getLogger
 from pwnlib.protocols.adb import AdbClient
-from pwnlib.util.packing import _decode
 from pwnlib.util import misc
+from pwnlib.util.packing import _decode
 
 log = getLogger(__name__)
+
 
 def adb(argv, *a, **kw):
     r"""Returns the output of an ADB subcommand.
@@ -87,13 +86,14 @@ def adb(argv, *a, **kw):
     if isinstance(argv, (bytes, str)):
         argv = [argv]
 
-    log.debug("$ " + ' '.join(context.adb + argv))
+    log.debug("$ " + " ".join(context.adb + argv))
 
     # All "adb shell" incantations should go through adb.process()
-    if argv[0] == 'shell':
+    if argv[0] == "shell":
         return process(argv[1:], *a, **kw).recvall()
 
     return tubes.process.process(context.adb + argv, *a, **kw).recvall()
+
 
 @context.quietfunc
 def devices(serial=None):
@@ -104,7 +104,7 @@ def devices(serial=None):
 
     for line in lines.splitlines():
         # Skip the first 'List of devices attached' line, and the final empty line.
-        if 'List of devices' in line or not line.strip():
+        if "List of devices" in line or not line.strip():
             continue
         device = AdbDevice.from_adb_output(line)
         if device.serial == serial:
@@ -112,6 +112,7 @@ def devices(serial=None):
         result.append(device)
 
     return tuple(result)
+
 
 def current_device(any=False):
     """Returns an ``AdbDevice`` instance for the currently-selected device
@@ -131,17 +132,19 @@ def current_device(any=False):
         if any or device == context.device:
             return device
 
+
 def with_device(f):
     @functools.wraps(f)
-    def wrapper(*a,**kw):
+    def wrapper(*a, **kw):
         if not context.device:
             device = current_device(any=True)
             if device:
-                log.warn_once('Automatically selecting device %s' % device)
+                log.warn_once("Automatically selecting device %s" % device)
                 context.device = device
         if not context.device:
-            log.error('No devices connected, cannot invoke %s.%s' % (f.__module__, f.__name__))
-        return f(*a,**kw)
+            log.error("No devices connected, cannot invoke %s.%s" % (f.__module__, f.__name__))
+        return f(*a, **kw)
+
     return wrapper
 
 
@@ -160,31 +163,33 @@ def root():
         with AdbClient() as c:
             reply = c.root()
 
-    if 'already running as root' in reply:
+    if "already running as root" in reply:
         return
 
-    elif not reply or 'restarting adbd as root' in reply:
+    elif not reply or "restarting adbd as root" in reply:
         with context.quiet:
             wait_for_device()
 
     else:
         log.error("Could not run as root:\n%s" % reply)
 
+
 def no_emulator(f):
     @functools.wraps(f)
-    def wrapper(*a,**kw):
+    def wrapper(*a, **kw):
         c = current_device()
-        if c and c.port == 'emulator':
+        if c and c.port == "emulator":
             log.error("Cannot invoke %s.%s on an emulator." % (f.__module__, f.__name__))
-        return f(*a,**kw)
+        return f(*a, **kw)
+
     return wrapper
+
 
 @no_emulator
 @with_device
 def reboot(wait=True):
-    """Reboots the device.
-    """
-    log.info('Rebooting device %s' % context.device)
+    """Reboots the device."""
+    log.info("Rebooting device %s" % context.device)
 
     with AdbClient() as c:
         c.reboot()
@@ -192,15 +197,16 @@ def reboot(wait=True):
     if wait:
         wait_for_device()
 
+
 @no_emulator
 @with_device
 def reboot_bootloader():
-    """Reboots the device to the bootloader.
-    """
-    log.info('Rebooting %s to bootloader' % context.device)
+    """Reboots the device to the bootloader."""
+    log.info("Rebooting %s to bootloader" % context.device)
 
     with AdbClient() as c:
         c.reboot_bootloader()
+
 
 @with_device
 def uptime():
@@ -217,8 +223,9 @@ def uptime():
         >>> adb.uptime() > 3 # normally AVD takes ~7 seconds to boot
         True
     """
-    up, idle = map(float, read('/proc/uptime').split())
+    up, idle = map(float, read("/proc/uptime").split())
     return up
+
 
 @with_device
 def boot_time():
@@ -237,10 +244,11 @@ def boot_time():
         >>> adb.boot_time() < time.time()
         True
     """
-    for line in read('/proc/stat').splitlines():
+    for line in read("/proc/stat").splitlines():
         name, value = line.split(None, 1)
-        if name == b'btime':
+        if name == b"btime":
             return int(value)
+
 
 class AdbDevice(Device):
     """Encapsulates information about a connected device.
@@ -262,16 +270,19 @@ class AdbDevice(Device):
         >>> device.serial
         'emulator-5554'
     """
-    def __init__(self, serial, type, port=None, product='unknown', model='unknown', device='unknown', features=None, **kw):
-        self.serial  = serial
-        self.type    = type
-        self.port    = port
-        self.product = product
-        self.model   = model.replace('_', ' ')
-        self.device  = device
-        self.os      = 'android'
 
-        if product == 'unknown':
+    def __init__(
+        self, serial, type, port=None, product="unknown", model="unknown", device="unknown", features=None, **kw
+    ):
+        self.serial = serial
+        self.type = type
+        self.port = port
+        self.product = product
+        self.model = model.replace("_", " ")
+        self.device = device
+        self.os = "android"
+
+        if product == "unknown":
             return
 
         # Deferred fields
@@ -301,27 +312,26 @@ class AdbDevice(Device):
         self.__do_deferred_initialization()
         return self._endian
 
-
     def __do_deferred_initialization(self):
         if self._initialized:
             return
 
         with context.local(device=self.serial):
-            abi = getprop('ro.product.cpu.abi')
+            abi = getprop("ro.product.cpu.abi")
             context.clear()
             context.arch = str(abi)
             self._arch = context.arch
             self._bits = context.bits
             self._endian = context.endian
 
-        if self.port == 'emulator':
-            emulator, port = self.serial.split('-')
+        if self.port == "emulator":
+            emulator, port = self.serial.split("-")
             port = int(port)
             try:
-                with remote('localhost', port, level='error') as r:
-                    r.recvuntil('OK')
-                    r.recvline() # Rest of the line
-                    r.sendline('avd name')
+                with remote("localhost", port, level="error") as r:
+                    r.recvuntil("OK")
+                    r.recvline()  # Rest of the line
+                    r.sendline("avd name")
                     self.avd = r.recvline().strip()
             except:
                 pass
@@ -332,9 +342,11 @@ class AdbDevice(Device):
         return self.serial
 
     def __repr__(self):
-        fields = ['serial', 'type', 'port', 'product', 'model', 'device']
-        return '%s(%s)' % (self.__class__.__name__,
-                           ', '.join(('%s=%r' % (field, getattr(self, field)) for field in fields)))
+        fields = ["serial", "type", "port", "product", "model", "device"]
+        return "%s(%s)" % (
+            self.__class__.__name__,
+            ", ".join("%s=%r" % (field, getattr(self, field)) for field in fields),
+        )
 
     @staticmethod
     def from_adb_output(line):
@@ -352,24 +364,26 @@ class AdbDevice(Device):
         fields = line.split()
 
         serial = fields[0]
-        type   = fields[1]
+        type = fields[1]
         kwargs = {}
 
-        if serial.startswith('emulator-'):
-            kwargs['port'] = 'emulator'
+        if serial.startswith("emulator-"):
+            kwargs["port"] = "emulator"
 
         for field in fields[2:]:
-            k,v = field.split(':', 1)
+            k, v = field.split(":", 1)
             kwargs[k] = v
 
         return AdbDevice(serial, type, **kwargs)
 
     def __wrapped(self, function):
         """Wraps a callable in a scope which selects the current device."""
+
         @functools.wraps(function)
         def wrapper(*a, **kw):
             with context.local(device=self):
-                return function(*a,**kw)
+                return function(*a, **kw)
+
         return wrapper
 
     def __getattr__(self, name):
@@ -384,20 +398,21 @@ class AdbDevice(Device):
             >>> adb.getprop(property) == device.getprop(property)
             True
         """
-        if name.startswith('_'):
+        if name.startswith("_"):
             raise AttributeError(name)
 
         with context.local(device=self):
             g = globals()
 
             if name not in g:
-                raise AttributeError('%r object has no attribute %r' % (type(self).__name__,name))
+                raise AttributeError("%r object has no attribute %r" % (type(self).__name__, name))
             value = g[name]
 
-        if not hasattr(value, '__call__'):
+        if not hasattr(value, "__call__"):
             return value
 
         return self.__wrapped(value)
+
 
 @LocalContext
 def wait_for_device(kick=False):
@@ -425,7 +440,7 @@ def wait_for_device(kick=False):
                 except Exception:
                     pass
 
-            serial = ''
+            serial = ""
             if context.device:
                 serial = str(context.device)
 
@@ -444,12 +459,10 @@ def wait_for_device(kick=False):
         with context.local(device=device):
             # There may be multiple devices, so context.device is
             # insufficient.  Pick the first device reported.
-            w.success('%s (%s %s %s)' % (device,
-                                         product(),
-                                         build(),
-                                         _build_date()))
+            w.success("%s (%s %s %s)" % (device, product(), build(), _build_date()))
 
             return context.device
+
 
 @with_device
 def disable_verity():
@@ -460,14 +473,15 @@ def disable_verity():
         with AdbClient() as c:
             reply = c.disable_verity()
 
-        if 'Verity already disabled' in reply:
+        if "Verity already disabled" in reply:
             return
-        elif 'Now reboot your device' in reply:
+        elif "Now reboot your device" in reply:
             reboot(wait=True)
-        elif '0006closed' in reply:
-            return # Emulator doesnt support Verity?
+        elif "0006closed" in reply:
+            return  # Emulator doesnt support Verity?
         else:
             log.error("Could not disable verity:\n%s" % reply)
+
 
 @with_device
 def remount():
@@ -479,8 +493,9 @@ def remount():
         with AdbClient() as c:
             reply = c.remount()
 
-        if 'remount succeeded' not in reply:
+        if "remount succeeded" not in reply:
             log.error("Could not remount filesystem:\n%s" % reply)
+
 
 @with_device
 def unroot():
@@ -488,27 +503,30 @@ def unroot():
     log.info("Unrooting %s" % context.device)
     with context.quiet:
         with AdbClient() as c:
-            reply  = c.unroot()
+            reply = c.unroot()
 
-    if '0006closed' == reply:
-        return # Emulator doesnt care
+    if "0006closed" == reply:
+        return  # Emulator doesnt care
 
-    if 'restarting adbd as non root' not in reply:
+    if "restarting adbd as non root" not in reply:
         log.error("Could not unroot:\n%s" % reply)
+
 
 def _create_adb_push_pull_callback(w):
     def callback(filename, data, size, chunk, chunk_size):
         have = len(data) + len(chunk)
         if size == 0:
-            size = '???'
-            percent = '???'
+            size = "???"
+            percent = "???"
         else:
             percent = int(100 * have // size)
             size = misc.size(size)
         have = misc.size(have)
-        w.status('%s/%s (%s%%)' % (have, size, percent))
+        w.status("%s/%s (%s%%)" % (have, size, percent))
         return True
+
     return callback
+
 
 @with_device
 def pull(remote_path, local_path=None):
@@ -537,13 +555,14 @@ def pull(remote_path, local_path=None):
     msg = "Pulling %r to %r" % (remote_path, local_path)
 
     if log.isEnabledFor(logging.DEBUG):
-        msg += ' (%s)' % context.device
+        msg += " (%s)" % context.device
 
     with log.waitfor(msg) as w:
         data = read(remote_path, callback=_create_adb_push_pull_callback(w))
         misc.write(local_path, data)
 
     return data
+
 
 @with_device
 def push(local_path, remote_path):
@@ -575,11 +594,10 @@ def push(local_path, remote_path):
     remote_filename = os.path.basename(local_path)
 
     if log.isEnabledFor(logging.DEBUG):
-        msg += ' (%s)' % context.device
+        msg += " (%s)" % context.device
 
     with log.waitfor(msg) as w:
         with AdbClient() as c:
-
             # We need to discover whether remote_path is a directory or not.
             # If we cannot stat the full path, assume it's a path-plus-filename,
             # where the filename does not exist.
@@ -591,18 +609,17 @@ def push(local_path, remote_path):
 
             # If we can't find the exact path, or its parent directory, bail!
             if not stat_:
-                log.error('Could not stat %r' % remote_path)
+                log.error("Could not stat %r" % remote_path)
 
             # If we found the parent directory, append the filename
-            mode = stat_['mode']
+            mode = stat_["mode"]
             if stat.S_ISDIR(mode):
                 remote_path = os.path.join(remote_path, remote_filename)
 
-            c.write(remote_path,
-                    misc.read(local_path),
-                    callback=_create_adb_push_pull_callback(w))
+            c.write(remote_path, misc.read(local_path), callback=_create_adb_push_pull_callback(w))
 
     return remote_path
+
 
 @context.quietfunc
 @with_device
@@ -631,17 +648,18 @@ def read(path, target=None, callback=None):
     with AdbClient() as c:
         stat = c.stat(path)
         if not stat:
-            log.error('Could not stat %r' % path)
-        data = c.read(path, stat['size'], callback=callback)
+            log.error("Could not stat %r" % path)
+        data = c.read(path, stat["size"], callback=callback)
 
     if target:
         misc.write(target, data)
 
     return data
 
+
 @context.quietfunc
 @with_device
-def write(path, data=b''):
+def write(path, data=b""):
     """Create a file on the device with the provided contents.
 
     Arguments:
@@ -659,6 +677,7 @@ def write(path, data=b''):
     with tempfile.NamedTemporaryFile() as temp:
         misc.write(temp.name, data)
         push(temp.name, path)
+
 
 @context.quietfunc
 @with_device
@@ -690,21 +709,22 @@ def mkdir(path):
         ...
         PwnlibException: mkdir failed for /init, File exists
     """
-    if not path.startswith('/'):
+    if not path.startswith("/"):
         log.error("Must provide an absolute path: %r" % path)
 
     with AdbClient() as c:
         st = c.stat(path)
 
         # Don't re-create existing directories
-        if st and stat.S_ISDIR(st['mode']):
+        if st and stat.S_ISDIR(st["mode"]):
             return
 
-        result = process(['mkdir', path]).recvall()
+        result = process(["mkdir", path]).recvall()
 
         # Any output at all is an error
         if result:
-            log.error(result.rstrip().decode('utf-8'))
+            log.error(result.rstrip().decode("utf-8"))
+
 
 @context.quietfunc
 @with_device
@@ -723,10 +743,11 @@ def makedirs(path):
         >>> adb.listdir('/data/local/tmp/this/is/a/directory')
         ['hierarchy']
     """
-    if path != '/':
+    if path != "/":
         makedirs(os.path.dirname(path))
 
     mkdir(path)
+
 
 @context.quietfunc
 @with_device
@@ -748,6 +769,7 @@ def exists(path):
     with AdbClient() as c:
         return bool(c.stat(path))
 
+
 @context.quietfunc
 @with_device
 def isdir(path):
@@ -767,7 +789,8 @@ def isdir(path):
     """
     with AdbClient() as c:
         st = c.stat(path)
-        return bool(st and stat.S_ISDIR(st['mode']))
+        return bool(st and stat.S_ISDIR(st["mode"]))
+
 
 @context.quietfunc
 @with_device
@@ -812,12 +835,13 @@ def unlink(path, recursive=False):
         if isdir(path) and c.list(path) and not recursive:
             log.error("Cannot delete non-empty directory %r without recursive=True" % path)
 
-        flags = '-rf' if recursive else '-f'
+        flags = "-rf" if recursive else "-f"
 
-        output = c.execute(['rm', flags, path]).recvall()
+        output = c.execute(["rm", flags, path]).recvall()
 
         if output:
-            log.error(output.decode('utf-8'))
+            log.error(output.decode("utf-8"))
+
 
 @with_device
 def process(argv, *a, **kw):
@@ -840,26 +864,30 @@ def process(argv, *a, **kw):
     if isinstance(argv, (bytes, str)):
         argv = [argv]
 
-    message = "Starting %s process %r" % ('Android', argv[0])
+    message = "Starting %s process %r" % ("Android", argv[0])
 
     if log.isEnabledFor(logging.DEBUG):
-        if argv != [argv[0]]: message += ' argv=%r ' % argv
+        if argv != [argv[0]]:
+            message += " argv=%r " % argv
 
     with log.progress(message) as p:
         return AdbClient().execute(argv)
+
 
 @with_device
 def interactive(**kw):
     """Spawns an interactive shell."""
     return shell(**kw).interactive()
 
+
 @with_device
 def shell(**kw):
     """Returns an interactive shell."""
-    return process(['sh', '-i'], **kw)
+    return process(["sh", "-i"], **kw)
+
 
 @with_device
-def which(name, all = False, *a, **kw):
+def which(name, all=False, *a, **kw):
     """Retrieves the full path to a binary in ``$PATH`` on the device
 
     Arguments:
@@ -887,7 +915,7 @@ def which(name, all = False, *a, **kw):
         []
     """
     # Unfortunately, there is no native 'which' on many phones.
-    which_cmd = '''
+    which_cmd = f"""
 (IFS=:
   for directory in $PATH; do
       [ -x "$directory/{name}" ] || continue;
@@ -895,14 +923,14 @@ def which(name, all = False, *a, **kw):
   done
 )
 [ -x "{name}" ] && echo -n "$PWD/{name}\\x00"
-'''.format(name=name)
+"""
 
     which_cmd = which_cmd.strip()
-    data = process(['sh','-c', which_cmd], *a, **kw).recvall()
+    data = process(["sh", "-c", which_cmd], *a, **kw).recvall()
     data = _decode(data)
     result = []
 
-    for path in data.split('\x00'):
+    for path in data.split("\x00"):
         # Skip empty entries
         if not path:
             continue
@@ -932,14 +960,16 @@ def whoami():
        >>> adb.whoami()
        b'root'
     """
-    return process(['sh','-ic','echo $USER']).recvall().strip()
+    return process(["sh", "-ic", "echo $USER"]).recvall().strip()
+
 
 @with_device
 def forward(port):
     """Sets up a port to forward to the device."""
-    tcp_port = 'tcp:%s' % port
-    adb(['forward', tcp_port, tcp_port])
-    atexit.register(lambda: adb(['forward', '--remove', tcp_port]))
+    tcp_port = "tcp:%s" % port
+    adb(["forward", tcp_port, tcp_port])
+    atexit.register(lambda: adb(["forward", "--remove", tcp_port]))
+
 
 @context.quietfunc
 @with_device
@@ -958,9 +988,10 @@ def logcat(stream=False):
     """
 
     if stream:
-        return process(['logcat'])
+        return process(["logcat"])
     else:
-        return process(['logcat', '-d']).recvall()
+        return process(["logcat", "-d"]).recvall()
+
 
 @with_device
 def pidof(name):
@@ -968,14 +999,15 @@ def pidof(name):
     with context.quiet:
         # Older devices have a broken 'pidof', apparently.
         # Try pgrep first.
-        io = process(['pgrep', name])
+        io = process(["pgrep", name])
         data = io.recvall()
 
-        if 'not found' in data:
-            io = process(['pidof', name])
+        if "not found" in data:
+            io = process(["pidof", name])
             data = io.recvall()
 
     return list(map(int, data.split()))
+
 
 @with_device
 def proc_exe(pid):
@@ -990,9 +1022,10 @@ def proc_exe(pid):
         b'/system/bin/init'
     """
     with context.quiet:
-        io  = process(['realpath','/proc/%d/exe' % pid])
+        io = process(["realpath", "/proc/%d/exe" % pid])
         data = io.recvall().strip()
     return data
+
 
 @with_device
 def getprop(name=None):
@@ -1015,18 +1048,18 @@ def getprop(name=None):
     """
     with context.quiet:
         if name:
-            result = process(['getprop', name]).recvall().strip()
+            result = process(["getprop", name]).recvall().strip()
             result = _decode(result)
             return result
 
-        result = process(['getprop']).recvall()
+        result = process(["getprop"]).recvall()
 
     result = _decode(result)
-    expr = r'\[([^\]]+)\]: \[(.*)\]'
+    expr = r"\[([^\]]+)\]: \[(.*)\]"
 
     props = {}
     for line in result.splitlines():
-        if not line.startswith('['):
+        if not line.startswith("["):
             continue
 
         name, value = re.search(expr, line).groups()
@@ -1038,13 +1071,15 @@ def getprop(name=None):
 
     return props
 
+
 @with_device
 def setprop(name, value):
     """Writes a property to the system property store."""
-    return process(['setprop', name, value]).recvall().strip()
+    return process(["setprop", name, value]).recvall().strip()
+
 
 @with_device
-def listdir(directory='/'):
+def listdir(directory="/"):
     """Returns a list containing the entries in the provided directory.
 
     Note:
@@ -1057,6 +1092,7 @@ def listdir(directory='/'):
     """
     return sorted(AdbClient().list(directory))
 
+
 @with_device
 def fastboot(args, *a, **kw):
     """Executes a fastboot command.
@@ -1064,23 +1100,27 @@ def fastboot(args, *a, **kw):
     Returns:
         The command output.
     """
-    argv = ['fastboot', '-s', str(context.device)] + list(args)
+    argv = ["fastboot", "-s", str(context.device)] + list(args)
     return tubes.process.process(argv, *a, **kw).recvall()
+
 
 @with_device
 def fingerprint():
     """Returns the device build fingerprint."""
-    return getprop('ro.build.fingerprint')
+    return getprop("ro.build.fingerprint")
+
 
 @with_device
 def product():
     """Returns the device product identifier."""
-    return getprop('ro.build.product')
+    return getprop("ro.build.product")
+
 
 @with_device
 def build():
     """Returns the Build ID of the device."""
-    return getprop('ro.build.id')
+    return getprop("ro.build.id")
+
 
 @with_device
 @no_emulator
@@ -1092,33 +1132,34 @@ def unlock_bootloader():
     """
     w = log.waitfor("Unlocking bootloader")
     with w:
-        if getprop('ro.oem_unlock_supported') == '0':
+        if getprop("ro.oem_unlock_supported") == "0":
             log.error("Bootloader cannot be unlocked: ro.oem_unlock_supported=0")
 
-        if getprop('ro.boot.oem_unlock_support') == '0':
+        if getprop("ro.boot.oem_unlock_support") == "0":
             log.error("Bootloader cannot be unlocked: ro.boot.oem_unlock_support=0")
 
-        if getprop('sys.oem_unlock_allowed') == '0':
+        if getprop("sys.oem_unlock_allowed") == "0":
             log.error("Bootloader cannot be unlocked: Enable OEM Unlock in developer settings first", context.device)
 
         AdbClient().reboot_bootloader()
 
         # Check to see if it's unlocked before attempting unlock
-        unlocked = fastboot(['getvar', 'unlocked'])
-        if 'unlocked: yes' in unlocked:
+        unlocked = fastboot(["getvar", "unlocked"])
+        if "unlocked: yes" in unlocked:
             w.success("Already unlocked")
-            fastboot(['continue'])
+            fastboot(["continue"])
             return
 
-        fastboot(['oem', 'unlock'])
-        unlocked = fastboot(['getvar', 'unlocked'])
+        fastboot(["oem", "unlock"])
+        unlocked = fastboot(["getvar", "unlocked"])
 
-        fastboot(['continue'])
+        fastboot(["continue"])
 
-        if 'unlocked: yes' not in unlocked:
+        if "unlocked: yes" not in unlocked:
             log.error("Unlock failed")
 
-class Kernel(object):
+
+class Kernel:
     _kallsyms = None
 
     @property
@@ -1132,7 +1173,7 @@ class Kernel(object):
             >>> hex(adb.kernel.address) # doctest: +ELLIPSIS
             '0x...000'
         """
-        return self.symbols['_text']
+        return self.symbols["_text"]
 
     @property
     @context.quietfunc
@@ -1142,7 +1183,7 @@ class Kernel(object):
         for line in self.kallsyms.splitlines():
             fields = line.split()
             address = int(fields[0], 16)
-            name    = fields[-1]
+            name = fields[-1]
             result[name] = address
         return result
 
@@ -1153,8 +1194,8 @@ class Kernel(object):
         if not self._kallsyms:
             self._kallsyms = {}
             root()
-            write('/proc/sys/kernel/kptr_restrict', '1')
-            self._kallsyms = read('/proc/kallsyms').decode('ascii')
+            write("/proc/sys/kernel/kptr_restrict", "1")
+            self._kallsyms = read("/proc/kallsyms").decode("ascii")
         return self._kallsyms
 
     @property
@@ -1162,50 +1203,49 @@ class Kernel(object):
     def version(self):
         """Returns the kernel version of the device."""
         root()
-        return read('/proc/version').strip()
+        return read("/proc/version").strip()
 
     @property
     @context.quietfunc
     def cmdline(self):
         root()
-        return read('/proc/cmdline').strip()
+        return read("/proc/cmdline").strip()
 
     @property
     @context.quietfunc
     def lastmsg(self):
         root()
-        if 'last_kmsg' in listdir('/proc'):
-            return read('/proc/last_kmsg')
+        if "last_kmsg" in listdir("/proc"):
+            return read("/proc/last_kmsg")
 
-        if 'console-ramoops' in listdir('/sys/fs/pstore/'):
-            return read('/sys/fs/pstore/console-ramoops')
+        if "console-ramoops" in listdir("/sys/fs/pstore/"):
+            return read("/sys/fs/pstore/console-ramoops")
 
     def enable_uart(self):
         """Reboots the device with kernel logging to the UART enabled."""
-        model = getprop('ro.product.model')
+        model = getprop("ro.product.model")
 
         known_commands = {
-            'Nexus 4': None,
-            'Nexus 5': None,
-            'Nexus 6': 'oem config console enable',
-            'Nexus 5X': None,
-            'Nexus 6P': 'oem uart enable',
-            'Nexus 7': 'oem uart-on',
+            "Nexus 4": None,
+            "Nexus 5": None,
+            "Nexus 6": "oem config console enable",
+            "Nexus 5X": None,
+            "Nexus 6P": "oem uart enable",
+            "Nexus 7": "oem uart-on",
         }
 
-        with log.waitfor('Enabling kernel UART'):
-
+        with log.waitfor("Enabling kernel UART"):
             if model not in known_commands:
                 log.error("Device UART is unsupported.")
 
             command = known_commands[model]
 
             if command is None:
-                w.success('Always enabled')
+                w.success("Always enabled")
                 return
 
             # Check the current commandline, it may already be enabled.
-            if any(s.startswith('console=tty') for s in self.cmdline.split()):
+            if any(s.startswith("console=tty") for s in self.cmdline.split()):
                 w.success("Already enabled")
                 return
 
@@ -1217,30 +1257,31 @@ class Kernel(object):
                 reboot_bootloader()
 
                 # Wait for device to come online
-                while context.device not in fastboot(['devices',' -l']):
+                while context.device not in fastboot(["devices", " -l"]):
                     time.sleep(0.5)
 
                 # Try the 'new' way
                 fastboot(command.split())
-                fastboot(['continue'])
+                fastboot(["continue"])
                 wait_for_device()
 
 
 kernel = Kernel()
 
-class Property(object):
+
+class Property:
     def __init__(self, name=None):
         # Need to avoid overloaded setattr() so we go through __dict__
-        self.__dict__['_name'] = name
+        self.__dict__["_name"] = name
 
     def __str__(self):
         return str(getprop(self._name)).strip()
 
     def __getattr__(self, attr):
-        if attr.startswith('_'):
+        if attr.startswith("_"):
             raise AttributeError(attr)
         if self._name:
-            attr = '%s.%s' % (self._name, attr)
+            attr = "%s.%s" % (self._name, attr)
         return Property(attr)
 
     def __setattr__(self, attr, value):
@@ -1248,7 +1289,7 @@ class Property(object):
             return super(Property, self).__setattr__(attr, value)
 
         if self._name:
-            attr = '%s.%s' % (self._name, attr)
+            attr = "%s.%s" % (self._name, attr)
         setprop(attr, value)
 
     def __eq__(self, other):
@@ -1270,22 +1311,25 @@ class Property(object):
         # Allow hash indices matching on the property
         return hash(self._name)
 
+
 properties = Property()
+
 
 def _build_date():
     """Returns the build date in the form YYYY-MM-DD as a string"""
-    as_string = getprop('ro.build.date')
-    as_datetime =  dateutil.parser.parse(as_string)
-    return as_datetime.strftime('%Y-%b-%d')
+    as_string = getprop("ro.build.date")
+    as_datetime = dateutil.parser.parse(as_string)
+    return as_datetime.strftime("%Y-%b-%d")
+
 
 def find_ndk_project_root(source):
-    '''Given a directory path, find the topmost project root.
+    """Given a directory path, find the topmost project root.
 
     tl;dr "foo/bar/jni/baz.cpp" ==> "foo/bar"
-    '''
+    """
     ndk_directory = os.path.abspath(source)
-    while ndk_directory != '/':
-        if os.path.exists(os.path.join(ndk_directory, 'jni')):
+    while ndk_directory != "/":
+        if os.path.exists(os.path.join(ndk_directory, "jni")):
             break
         ndk_directory = os.path.dirname(ndk_directory)
     else:
@@ -1293,7 +1337,8 @@ def find_ndk_project_root(source):
 
     return ndk_directory
 
-_android_mk_template = '''
+
+_android_mk_template = """
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
@@ -1301,17 +1346,18 @@ LOCAL_MODULE := %(local_module)s
 LOCAL_SRC_FILES := %(local_src_files)s
 
 include $(BUILD_EXECUTABLE)
-'''.lstrip()
+""".lstrip()
 
-_application_mk_template = '''
+_application_mk_template = """
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 APP_ABI:= %(app_abi)s
 APP_PLATFORM:=%(app_platform)s
-'''.lstrip()
+""".lstrip()
 
-def _generate_ndk_project(file_list, abi='arm-v7a', platform_version=21):
+
+def _generate_ndk_project(file_list, abi="arm-v7a", platform_version=21):
     # Create our project root
     root = tempfile.mkdtemp()
 
@@ -1319,7 +1365,7 @@ def _generate_ndk_project(file_list, abi='arm-v7a', platform_version=21):
         file_list = [file_list]
 
     # Copy over the source file(s)
-    jni_directory = os.path.join(root, 'jni')
+    jni_directory = os.path.join(root, "jni")
     os.mkdir(jni_directory)
     for file in file_list:
         shutil.copy(file, jni_directory)
@@ -1329,19 +1375,20 @@ def _generate_ndk_project(file_list, abi='arm-v7a', platform_version=21):
     # Populate Android.mk
     local_module = os.path.basename(file_list[0])
     local_module, _ = os.path.splitext(local_module)
-    local_src_files = ' '.join(list(map(os.path.basename, file_list)))
-    Android_mk = os.path.join(jni_directory, 'Android.mk')
-    with open(Android_mk, 'w+') as f:
+    local_src_files = " ".join(list(map(os.path.basename, file_list)))
+    Android_mk = os.path.join(jni_directory, "Android.mk")
+    with open(Android_mk, "w+") as f:
         f.write(_android_mk_template % locals())
 
     # Populate Application.mk
     app_abi = abi
-    app_platform = 'android-%s' % platform_version
-    Application_mk = os.path.join(jni_directory, 'Application.mk')
-    with open(Application_mk, 'w+') as f:
+    app_platform = "android-%s" % platform_version
+    Application_mk = os.path.join(jni_directory, "Application.mk")
+    with open(Application_mk, "w+") as f:
         f.write(_application_mk_template % locals())
 
     return root
+
 
 def compile(source):
     r"""Compile a source file or project with the Android NDK.
@@ -1367,17 +1414,16 @@ def compile(source):
         b'... /system/lib64/libc++.so\n...'
     """
 
-    ndk_build = misc.which('ndk-build')
+    ndk_build = misc.which("ndk-build")
     if not ndk_build:
         # Ensure that we can find the NDK.
-        for envvar in ('NDK', 'ANDROID_NDK', 'ANDROID_NDK_ROOT',
-                       'ANDROID_NDK_HOME', 'ANDROID_NDK_LATEST_HOME'):
+        for envvar in ("NDK", "ANDROID_NDK", "ANDROID_NDK_ROOT", "ANDROID_NDK_HOME", "ANDROID_NDK_LATEST_HOME"):
             ndk = os.environ.get(envvar)
             if ndk is not None:
                 break
         else:
-            log.error('$NDK must be set to the Android NDK directory')
-        ndk_build = os.path.join(ndk, 'ndk-build')
+            log.error("$NDK must be set to the Android NDK directory")
+        ndk_build = os.path.join(ndk, "ndk-build")
 
     # Determine whether the source is an NDK project or a single source file.
     project = find_ndk_project_root(source)
@@ -1385,20 +1431,20 @@ def compile(source):
     if not project:
         # Realistically this should inherit from context.arch, but
         # this works for now.
-        sdk = '21'
+        sdk = "21"
         abi = {
-            'aarch64': 'arm64-v8a',
-            'amd64':   'x86_64',
-            'arm':     'armeabi-v7a',
-            'i386':    'x86',
-            'mips':    'mips',
-            'mips64':  'mips64',
+            "aarch64": "arm64-v8a",
+            "amd64": "x86_64",
+            "arm": "armeabi-v7a",
+            "i386": "x86",
+            "mips": "mips",
+            "mips64": "mips64",
         }.get(context.arch, None)
 
         # If we have an attached device, use its settings.
         if context.device:
-            abi = getprop('ro.product.cpu.abi')
-            sdk = getprop('ro.build.version.sdk')
+            abi = getprop("ro.product.cpu.abi")
+            sdk = getprop("ro.build.version.sdk")
 
         if abi is None:
             log.error("Unknown CPU ABI")
@@ -1406,12 +1452,12 @@ def compile(source):
         project = _generate_ndk_project(source, abi, sdk)
 
     # Remove any output files
-    lib = os.path.join(project, 'libs')
+    lib = os.path.join(project, "libs")
     if os.path.exists(lib):
         shutil.rmtree(lib)
 
     # Build the project
-    io = tubes.process.process(ndk_build, cwd=os.path.join(project, 'jni'))
+    io = tubes.process.process(ndk_build, cwd=os.path.join(project, "jni"))
 
     result = io.recvall()
 
@@ -1419,11 +1465,12 @@ def compile(source):
         log.error("Build failed:\n%s", result)
 
     # Find all of the output files
-    output = glob.glob(os.path.join(lib, '*', '*'))
+    output = glob.glob(os.path.join(lib, "*", "*"))
 
     return output[0]
 
-class Partition(object):
+
+class Partition:
     def __init__(self, path, name, blocks=0):
         self.path = path
         self.name = name
@@ -1432,13 +1479,14 @@ class Partition(object):
 
     @property
     def data(self):
-        with log.waitfor('Fetching %r partition (%s)' % (self.name, self.path)):
+        with log.waitfor("Fetching %r partition (%s)" % (self.name, self.path)):
             return read(self.path)
+
 
 @with_device
 def walk(top, topdown=True):
     join = os.path.join
-    isdir = lambda x: stat.S_ISDIR(x['mode'])
+    isdir = lambda x: stat.S_ISDIR(x["mode"])
     client = AdbClient()
     names = client.list(top)
 
@@ -1458,24 +1506,27 @@ def walk(top, topdown=True):
     if not topdown:
         yield top, dirs, nondirs
 
+
 @with_device
 def find(top, name):
     for root, dirs, files in walk(top):
         if name in files or name in dirs:
             yield os.path.join(root, name)
 
+
 @with_device
 def readlink(path):
-    path = process(['realpath', path]).recvall()
+    path = process(["realpath", path]).recvall()
 
     # Readlink will emit a single newline
     # We can't use the '-n' flag since old versions don't support it
-    if path.endswith(b'\n'):
+    if path.endswith(b"\n"):
         path = path[:-1]
 
     return path.decode()
 
-class Partitions(object):
+
+class Partitions:
     """Enable access to partitions
 
     Example:
@@ -1486,14 +1537,15 @@ class Partitions(object):
         >>> hex(adb.partitions.vda.size) # doctest: +ELLIPSIS
         '0x...000'
     """
+
     @property
     @context.quietfunc
     def by_name_dir(self):
         try:
             with context.local(log_level=logging.FATAL):
-                return next(find('/dev/block/platform','by-name'))
+                return next(find("/dev/block/platform", "by-name"))
         except (StopIteration, PwnlibException):
-            return '/dev/block'
+            return "/dev/block"
 
     @context.quietfunc
     def __dir__(self):
@@ -1501,7 +1553,7 @@ class Partitions(object):
 
     @context.quietfunc
     def iter_proc_partitions(self):
-        for line in read('/proc/partitions').splitlines():
+        for line in read("/proc/partitions").splitlines():
             if not line.strip():
                 continue
             major, minor, blocks, name = line.split(None, 4)
@@ -1521,7 +1573,7 @@ class Partitions(object):
         return iter(names)
 
     def __getattr__(self, attr):
-        if attr.startswith('_'):
+        if attr.startswith("_"):
             raise AttributeError(attr)
 
         for name in self:
@@ -1546,7 +1598,9 @@ class Partitions(object):
 
         return Partition(devpath, attr, int(blocks))
 
+
 partitions = Partitions()
+
 
 def install(apk, *arguments):
     """Install an APK onto the device.
@@ -1558,23 +1612,24 @@ def install(apk, *arguments):
         arguments: Supplementary arguments to 'pm install',
             e.g. ``'-l', '-g'``.
     """
-    if not apk.endswith('.apk'):
+    if not apk.endswith(".apk"):
         log.error("APK must have .apk extension")
 
     basename = os.path.basename(apk)
-    target_path = '/data/local/tmp/{}.apk'.format(basename)
+    target_path = f"/data/local/tmp/{basename}.apk"
 
-    with log.progress("Installing APK {}".format(basename)) as p:
+    with log.progress(f"Installing APK {basename}") as p:
         with context.quiet:
-            p.status('Copying APK to device')
+            p.status("Copying APK to device")
             push(apk, target_path)
 
-            p.status('Installing')
-            result = process(['pm', 'install-create', target_path] + list(arguments)).recvall()
+            p.status("Installing")
+            result = process(["pm", "install-create", target_path] + list(arguments)).recvall()
 
             status = result.splitlines()[-1]
-            if 'Success' not in status:
+            if "Success" not in status:
                 log.error(status)
+
 
 def uninstall(package, *arguments):
     """Uninstall an APK from the device.
@@ -1585,9 +1640,10 @@ def uninstall(package, *arguments):
         package(str): Name of the package to uninstall (e.g. ``'com.foo.MyPackage'``)
         arguments: Supplementary arguments to ``'pm install'``, e.g. ``'-k'``.
     """
-    with log.progress("Uninstalling package {}".format(package)):
+    with log.progress(f"Uninstalling package {package}"):
         with context.quiet:
-            return process(['pm','uninstall',package] + list(arguments)).recvall()
+            return process(["pm", "uninstall", package] + list(arguments)).recvall()
+
 
 @context.quietfunc
 def packages():
@@ -1595,12 +1651,12 @@ def packages():
     # Decodes the received bytes as UTF-8 per:
     # https://developer.android.com/reference/java/nio/charset/Charset#defaultCharset()
     # where it is specified that UTF-8 is the default charset for Android.
-    packages = process(['pm', 'list', 'packages']).recvall().decode('utf-8')
-    return [line.split('package:', 1)[-1] for line in packages.splitlines()]
+    packages = process(["pm", "list", "packages"]).recvall().decode("utf-8")
+    return [line.split("package:", 1)[-1] for line in packages.splitlines()]
+
 
 @context.quietfunc
 def version():
     """Returns rthe platform version as a tuple."""
-    prop = getprop('ro.build.version.release')
-    return [int(v) for v in prop.split('.')]
-
+    prop = getprop("ro.build.version.release")
+    return [int(v) for v in prop.split(".")]

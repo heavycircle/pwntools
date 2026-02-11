@@ -1,10 +1,9 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 from pwnlib.context import context
 
 
-class Buffer(object):
+class Buffer:
     """
     List of strings with some helper routines.
 
@@ -32,8 +31,9 @@ class Buffer(object):
         The ``0th`` item in the buffer is the oldest item, and
         will be received first.
     """
-    def __init__(self, buffer_fill_size = None):
-        self.data = [] # Buffer
+
+    def __init__(self, buffer_fill_size=None):
+        self.data = []  # Buffer
         self.size = 0  # Length
         self.buffer_fill_size = buffer_fill_size
 
@@ -90,7 +90,8 @@ class Buffer(object):
             data(str,Buffer): Data to add
         """
         # Fast path for ''
-        if not data: return
+        if not data:
+            return
 
         if isinstance(data, Buffer):
             self.size += data.size
@@ -124,7 +125,7 @@ class Buffer(object):
             self.data.insert(0, data)
             self.size += len(data)
 
-    def get(self, want=float('inf')):
+    def get(self, want=float("inf")):
         """
         Retrieves bytes from the buffer.
 
@@ -146,27 +147,27 @@ class Buffer(object):
         """
         # Fast path, get all of the data
         if want >= self.size:
-            data   = b''.join(self.data)
+            data = b"".join(self.data)
             self.size = 0
             self.data = []
             return data
 
         # Slow path, find the correct-index chunk
         have = 0
-        i    = 0
+        i = 0
         while want >= have:
             have += len(self.data[i])
-            i    += 1
+            i += 1
 
         # Join the chunks, evict from the buffer
-        data   = b''.join(self.data[:i])
+        data = b"".join(self.data[:i])
         self.data = self.data[i:]
 
         # If the last chunk puts us over the limit,
         # stick the extra back at the beginning.
         if have > want:
             extra = data[want:]
-            data  = data[:want]
+            data = data[:want]
             self.data.insert(0, extra)
 
         # Size update

@@ -1,9 +1,13 @@
-from pwnlib.context import context
-from pwnlib.util.packing import unpack
-from pwnlib.log import getLogger
+from __future__ import annotations
+
 from enum import IntEnum
 
+from pwnlib.context import context
+from pwnlib.log import getLogger
+from pwnlib.util.packing import unpack
+
 log = getLogger(__name__)
+
 
 class Dtype(IntEnum):
     DT_UNK = 0
@@ -16,6 +20,7 @@ class Dtype(IntEnum):
     DT_SOCK = 12
     DT_WHT = 14
     DT_SUBVOL = 16
+
 
 class linux_dirent:
     """
@@ -79,7 +84,7 @@ class linux_dirent:
             d_type = unpack(buf[self.d_reclen - 1 : self.d_reclen], 8)
             self.d_name = buf[2 * size_t + 2 : self.d_reclen - 1]
 
-        self.d_name = self.d_name.split(b'\x00', 1)[0].decode('utf-8')
+        self.d_name = self.d_name.split(b"\x00", 1)[0].decode("utf-8")
         self.d_type = Dtype(d_type)
 
     def __len__(self):
@@ -89,7 +94,7 @@ class linux_dirent:
         return self.d_name
 
     def __repr__(self):
-        return f'{self.d_type.name:<8}{self.d_name}'
+        return f"{self.d_type.name:<8}{self.d_name}"
 
 
 def dirents(buf: bytes) -> list[linux_dirent]:
@@ -107,7 +112,7 @@ def dirents(buf: bytes) -> list[linux_dirent]:
         >>> with context.local(bytes = 4):
         ...     buf = bytes.fromhex('5e843600c120fc1a1400746573742e63000000085f8436001f347e3010002e00be36ba040d002c00ffffff7f10002e2e00000004')
         ...     print(dirents(buf))
-        ...     
+        ...
         [DT_REG  test.c, DT_DIR  ., DT_DIR  ..]
     """
 
@@ -125,6 +130,7 @@ def dirents(buf: bytes) -> list[linux_dirent]:
             break
     return entries
 
+
 def dirents64(buf: bytes) -> list[linux_dirent]:
     """dirents(buf: bytes) -> list[linux_dirent]:
 
@@ -140,7 +146,7 @@ def dirents64(buf: bytes) -> list[linux_dirent]:
         >>> with context.local(bytes = 8):
         ...     buf = bytes.fromhex('223a2c0000000000786a631cc120fc1a200008746573742e63007464040000000d002c00000000004802ee451f347e301800042e0000000002002c0000000000ffffffffffffff7f1800042e2e000000')
         ...     print(dirents64(buf))
-        ...     
+        ...
         [DT_REG  test.c, DT_DIR  ., DT_DIR  ..]
     """
 

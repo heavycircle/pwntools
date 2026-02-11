@@ -5,17 +5,16 @@ Documentation is available here_.
 
 .. _here: https://android.googlesource.com/platform/system/core/+/master/adb/protocol.txt
 """
-from __future__ import absolute_import
-from __future__ import division
 
-import logging
+from __future__ import annotations
+
 import functools
+import logging
 import stat
 import time
 
 from pwnlib.context import context
-from pwnlib.log import Logger
-from pwnlib.log import getLogger
+from pwnlib.log import Logger, getLogger
 from pwnlib.tubes.listen import listen
 from pwnlib.tubes.process import process
 from pwnlib.tubes.remote import remote
@@ -27,36 +26,46 @@ from pwnlib.util.sh_string import sh_string
 
 log = getLogger(__name__)
 
+
 def pack(val):
-    return '%04x' % val
+    return "%04x" % val
+
 
 def unpack(val):
     return int(val, 16)
 
+
 OKAY = b"OKAY"
 FAIL = b"FAIL"
 
-class Message(object):
+
+class Message:
     """An ADB hex-length-prefixed message"""
+
     def __init__(self, string):
         self.string = string
+
     def __bytes__(self):
         return self.__flat__()
+
     def __str__(self):
         return self.__flat__()
+
     def __flat__(self):
-        return b'%04x' % len(self.string) + self.string
+        return b"%04x" % len(self.string) + self.string
+
 
 class Connection(remote):
     """Connection to the ADB server"""
+
     def __init__(self, host, port, level=None, *a, **kw):
         super(Connection, self).__init__(host, port, level=level, *a, **kw)
 
         self._executable = None
-        self._argv       = None
-        self._pid        = None
-        self._cwd        = None
-        self._env        = None
+        self._argv = None
+        self._pid = None
+        self._cwd = None
+        self._env = None
 
     def close(self):
         with context.quiet:
@@ -70,14 +79,17 @@ class Connection(remote):
         return unpack(self.recvn(4))
 
     def flat32(self, *a, **kw):
-        kw.setdefault('word_size', 32)
+        kw.setdefault("word_size", 32)
         return super(Connection, self).flat(*a, **kw)
+
 
 class Process(Connection):
     """Duck-typed ``tubes.remote`` object to add properties of a ``tubes.process``"""
 
+
 class AdbClient(Logger):
     """ADB Client"""
+
     def __init__(self, level=None):
         super(AdbClient, self).__init__()
 
@@ -86,7 +98,7 @@ class AdbClient(Logger):
 
         self.host = context.adb_host
         self.port = context.adb_port
-        self._c   = None
+        self._c = None
 
     @property
     def c(self):
@@ -102,14 +114,12 @@ class AdbClient(Logger):
             except Exception:
                 # If the connection fails, try starting a server on that port
                 # as long as it's the *default* port.
-                if self.host == context.defaults['adb_host'] \
-                and self.port == context.defaults['adb_port']:
+                if self.host == context.defaults["adb_host"] and self.port == context.defaults["adb_port"]:
                     log.warn("Could not connect to ADB server, trying to start it")
-                    process(context.adb + ['start-server']).recvall()
+                    process(context.adb + ["start-server"]).recvall()
                     time.sleep(0.3)
                 else:
-                    log.exception('Could not connect to ADB server (%s:%s)',
-                                  self.host, self.port)
+                    log.exception("Could not connect to ADB server (%s:%s)", self.host, self.port)
 
         # Final attempt...
         if not self._c:
@@ -119,6 +129,7 @@ class AdbClient(Logger):
     def _autoclose(fn):
         """Decorator which automatically closes the connection to the ADB server
         after calling the decorated function."""
+
         @functools.wraps(fn)
         def wrapper(self, *a, **kw):
             rv = fn(self, *a, **kw)
@@ -126,11 +137,13 @@ class AdbClient(Logger):
                 self._c.close()
                 self._c = None
             return rv
+
         return wrapper
 
     def _with_transport(fn):
         """Decorator which automatically selects a device transport before calling
         the decorated function, and closes the connection afterward."""
+
         @functools.wraps(fn)
         def wrapper(self, *a, **kw):
             self.transport()
@@ -139,12 +152,13 @@ class AdbClient(Logger):
                 self._c.close()
                 self._c = None
             return rv
+
         return wrapper
 
     def send(self, *a, **kw):
         """Sends data to the ADB server"""
         if isinstance(a[0], str):
-            a = (a[0].encode('utf-8'),) + a[1:]
+            a = (a[0].encode("utf-8"),) + a[1:]
         return self.c.adb_send(*a, **kw)
 
     def unpack(self, *a, **kw):
@@ -159,7 +173,7 @@ class AdbClient(Logger):
     @_autoclose
     def kill(self):
         """Kills the remote ADB server"
-        
+
         .. doctest::
            :skipif: skip_android
 
@@ -177,7 +191,7 @@ class AdbClient(Logger):
             >>> c.wait_for_device() # ensure doctests alive
         """
         try:
-            self.send('host:kill')
+            self.send("host:kill")
         except EOFError:
             pass
 
@@ -188,14 +202,14 @@ class AdbClient(Logger):
             Tuple containing the ``(major, minor)`` version from the ADB server
 
         Example:
-        
+
         .. doctest::
            :skipif: skip_android
 
             >>> pwnlib.protocols.adb.AdbClient().version() # doctest: +SKIP
             (4, 36)
         """
-        response = self.send('host:version')
+        response = self.send("host:version")
         if response == OKAY:
             return (self.c.adb_unpack(), self.c.adb_unpack())
         self.error("Could not fetch version")
@@ -208,14 +222,14 @@ class AdbClient(Logger):
         Returns:
             String representation of all available devices.
         """
-        msg = 'host:devices'
+        msg = "host:devices"
         if long:
-            msg += '-l'
+            msg += "-l"
         response = self.send(msg)
         if response == OKAY:
             l = self.recvl()
-            if not hasattr(l, 'encode'):
-                l = l.decode('utf-8')
+            if not hasattr(l, "encode"):
+                l = l.decode("utf-8")
             return l
         self.error("Could not enumerate devices")
 
@@ -226,11 +240,11 @@ class AdbClient(Logger):
             Generator which returns a short-format listing of available
             devices each time a device state changes.
         """
-        self.send('host:track-devices')
+        self.send("host:track-devices")
         while True:
             l = self.recvl()
-            if not hasattr(l, 'encode'):
-                l = l.decode('utf-8')
+            if not hasattr(l, "encode"):
+                l = l.decode("utf-8")
             yield l
 
     def transport(self, serial=None, try_again=True):
@@ -252,13 +266,13 @@ class AdbClient(Logger):
         if serial:
             # Extract the serial, str(Device) --> serial
             serial = str(serial)
-            msg = 'host:transport:%s' % serial
+            msg = "host:transport:%s" % serial
         else:
-            msg = 'host:transport-any'
+            msg = "host:transport-any"
 
         if self.send(msg) == FAIL:
-            err = self.recvl().decode('utf-8')
-            if err == 'device offline' and try_again:
+            err = self.recvl().decode("utf-8")
+            if err == "device offline" and try_again:
                 self.wait_for_device(serial)
                 return self.transport(serial, try_again=False)
             if serial:
@@ -285,7 +299,7 @@ class AdbClient(Logger):
         self.transport(context.device)
         if isinstance(argv, str):
             argv = [argv]
-        cmd = 'exec:%s' % (' '.join(map(sh_string, argv)))
+        cmd = "exec:%s" % (" ".join(map(sh_string, argv)))
         if OKAY == self.send(cmd):
             rv = self._c
             self._c = None
@@ -297,86 +311,89 @@ class AdbClient(Logger):
         def wrapper(self):
             self.send(string)
             return self.c.recvall()
+
         return wrapper
 
     @_autoclose
     @_with_transport
     def remount(self):
-        self.send('remount:')
+        self.send("remount:")
         return self.c.recvall()
 
     @_autoclose
     @_with_transport
     def root(self):
-        self.send('root:')
-        rv = self.c.recvall().decode('utf-8')
+        self.send("root:")
+        rv = self.c.recvall().decode("utf-8")
         time.sleep(0.1)
         return rv
 
     @_autoclose
     @_with_transport
     def unroot(self):
-        self.send('unroot:')
-        return self.c.recvall().decode('utf-8')
+        self.send("unroot:")
+        return self.c.recvall().decode("utf-8")
 
     @_autoclose
     @_with_transport
     def disable_verity(self):
-        self.send('disable-verity:')
+        self.send("disable-verity:")
         return self.c.recvall()
 
     @_autoclose
     @_with_transport
     def enable_verity(self):
-        self.send('enable-verity:')
+        self.send("enable-verity:")
         return self.c.recvall()
 
     @_autoclose
     @_with_transport
     def reconnect(self):
-        self.send('reconnect:')
+        self.send("reconnect:")
         return self.c.recvall()
 
     @_autoclose
     @_with_transport
     def reboot(self):
-        self.send('reboot:')
+        self.send("reboot:")
         return self.c.recvall()
 
     @_autoclose
     @_with_transport
     def reboot_bootloader(self):
-        self.send('reboot:bootloader')
+        self.send("reboot:bootloader")
         return self.c.recvall()
 
     @_autoclose
-    def wait_for_device(self, serial=''):
+    def wait_for_device(self, serial=""):
         if serial:
-            response = self.send('host-serial:%s:wait-for-any-device' % serial)
+            response = self.send("host-serial:%s:wait-for-any-device" % serial)
         else:
-            response = self.send('host:wait-for-any-device')
+            response = self.send("host:wait-for-any-device")
 
         # The first OKAY is that the command was understood
         if response != OKAY:
             if response == FAIL:
-                response = self.recvl().decode('utf-8')
+                response = self.recvl().decode("utf-8")
             self.error("An error occurred while trying to wait for device with serial %r (%r)" % (serial, response))
 
         # The second OKAY is that the device is available
         response = self.c.recvn(4)
         if response != OKAY:
             if response == FAIL:
-                response = self.recvl().decode('utf-8')
+                response = self.recvl().decode("utf-8")
             self.error("An error occurred while waiting for device with serial %r (%r)" % (serial, response))
 
     def _sync(fn):
         """Decorator which enters 'sync:' mode to the selected transport,
         then invokes the decorated funciton."""
+
         @functools.wraps(fn)
         def wrapper(self, *a, **kw):
-            if self.send('sync:') == FAIL:
-                self.error("An error occurred while trying to use SYNC API (%r)" % self.recvl().decode('utf-8'))
+            if self.send("sync:") == FAIL:
+                self.error("An error occurred while trying to use SYNC API (%r)" % self.recvl().decode("utf-8"))
             return fn(self, *a, **kw)
+
         return wrapper
 
     def list(self, path):
@@ -405,7 +422,7 @@ class AdbClient(Logger):
             'adb root', since adbd then runs in the ``su`` domain.
 
         Examples:
-        
+
         .. doctest::
            :skipif: skip_android
 
@@ -423,7 +440,7 @@ class AdbClient(Logger):
         if not st:
             log.error("Cannot list directory %r: Does not exist" % path)
 
-        if not stat.S_ISDIR(st['mode']):
+        if not stat.S_ISDIR(st["mode"]):
             log.error("Cannot list directory %r: Path is not a directory" % path)
 
         return self._list(path)
@@ -432,33 +449,31 @@ class AdbClient(Logger):
     @_sync
     def _list(self, path):
         if isinstance(path, str):
-            path = path.encode('utf-8')
-        self.c.flat32(b'LIST', len(path), path)
+            path = path.encode("utf-8")
+        self.c.flat32(b"LIST", len(path), path)
         files = {}
         while True:
             response = self.c.recvn(4)
 
-            if response == b'DONE':
+            if response == b"DONE":
                 break
 
-            if response != b'DENT':
-                self.error('Unexpected response: %r' % response)
+            if response != b"DENT":
+                self.error("Unexpected response: %r" % response)
 
             mode = self.c.u32()
             size = self.c.u32()
             time = self.c.u32()
             name = self.c.recvn(self.c.u32())
 
-            if not hasattr(name, 'encode'):
-                name = name.decode('utf-8')
+            if not hasattr(name, "encode"):
+                name = name.decode("utf-8")
 
             # Ignore the current directory and parent
-            if name in ('', '.', '..'):
+            if name in ("", ".", ".."):
                 continue
 
-            files[name] = {'mode': mode,
-                           'size': size,
-                           'time': time}
+            files[name] = {"mode": mode, "size": size, "time": time}
 
         return files
 
@@ -475,7 +490,7 @@ class AdbClient(Logger):
             If the file cannot be stat() ed, None is returned.
 
         Example:
-        
+
         .. doctest::
            :skipif: skip_android
 
@@ -486,19 +501,19 @@ class AdbClient(Logger):
             True
         """
         if isinstance(path, str):
-            path = path.encode('utf-8')
-        self.c.flat32(b'STAT', len(path), path)
-        if self.c.recvn(4) != b'STAT':
+            path = path.encode("utf-8")
+        self.c.flat32(b"STAT", len(path), path)
+        if self.c.recvn(4) != b"STAT":
             self.error("An error occurred while attempting to STAT a file.")
 
         mode = self.c.u32()
         size = self.c.u32()
         time = self.c.u32()
 
-        if (mode,size,time) == (0,0,0):
+        if (mode, size, time) == (0, 0, 0):
             return None
 
-        return {'mode': mode, 'size': size, 'time': time}
+        return {"mode": mode, "size": size, "time": time}
 
     def write(self, path, data, mode=0o755, timestamp=None, callback=None):
         """Execute the ``WRITE`` command of the ``SYNC`` API.
@@ -521,7 +536,7 @@ class AdbClient(Logger):
         # Writing to a directory is supported, but creates a temporary file
         st = self.stat(path)
 
-        if st and stat.S_ISDIR(st['mode']):
+        if st and stat.S_ISDIR(st["mode"]):
             log.error("Cannot write to %r: Path is a directory" % path)
 
         return self._write(path, data, mode=0o755, timestamp=None, callback=None)
@@ -530,16 +545,16 @@ class AdbClient(Logger):
     @_sync
     def _write(self, path, data, mode=0o755, timestamp=None, callback=None):
         if isinstance(path, str):
-            path = path.encode('utf-8')
-        path += b',%d' % mode
+            path = path.encode("utf-8")
+        path += b",%d" % mode
 
-        self.c.flat32(b'SEND', len(path), path)
+        self.c.flat32(b"SEND", len(path), path)
 
         sent = 0
 
         # Data needs to be broken up into chunks!
         for chunk in group(0x10000, data):
-            self.c.flat32(b'DATA', len(chunk), chunk)
+            self.c.flat32(b"DATA", len(chunk), chunk)
             if callback:
                 callback(path, data[:sent], len(data), chunk, len(chunk))
             sent += len(chunk)
@@ -547,13 +562,12 @@ class AdbClient(Logger):
         # Send completion notification and timestamp
         if timestamp is None:
             timestamp = int(time.time())
-        self.c.flat32(b'DONE', timestamp)
+        self.c.flat32(b"DONE", timestamp)
 
         result = self.c.recvn(4)
         if result != OKAY:
             log.error("Sync write failed: %r (expected OKAY)" % result)
 
-        return
 
     @_with_transport
     @_sync
@@ -576,62 +590,60 @@ class AdbClient(Logger):
             The data received as a string.
         """
         if isinstance(path, str):
-            path = path.encode('utf-8')
-        self.c.send(b'RECV' + p32(len(path)) + path)
+            path = path.encode("utf-8")
+        self.c.send(b"RECV" + p32(len(path)) + path)
 
         # Accumulate all data here
-        all_data = b''
+        all_data = b""
 
         while True:
             magic = self.c.recvn(4)
 
             # adbd says there is no more data to send
-            if magic == b'DONE':
+            if magic == b"DONE":
                 break
 
             if magic == FAIL:
-                self.error('Could not read file %r: Got FAIL.' % path)
+                self.error("Could not read file %r: Got FAIL." % path)
 
             # did we expect to be done?
-            if magic != b'DATA':
-                self.error('Error after file read: %r (expected DATA)' % magic)
+            if magic != b"DATA":
+                self.error("Error after file read: %r (expected DATA)" % magic)
 
             # receive all of the data in the chunk
             chunk_size = self.c.u32()
-            chunk_data  = b''
+            chunk_data = b""
             while len(chunk_data) != chunk_size:
                 chunk_data += self.c.recv(chunk_size - len(chunk_data))
 
                 if callback:
-                    callback(path,
-                             all_data,
-                             filesize,
-                             chunk_data,
-                             chunk_size)
+                    callback(path, all_data, filesize, chunk_data, chunk_size)
 
             # add the chunk onto what we have
             all_data += chunk_data
 
         zero = self.c.u32()
         if zero != 0:
-            self.error('Error after file read: %r (expected ZERO)' % zero)
+            self.error("Error after file read: %r (expected ZERO)" % zero)
 
         return all_data
 
     @_with_transport
     def forward(self, device, host_proto, host_port, device_proto, device_port):
-        self.send('host:forward:%s:%s;%s:%s' % (host_proto, host_port, device_proto, device_port))
+        self.send("host:forward:%s:%s;%s:%s" % (host_proto, host_port, device_proto, device_port))
         self.c.recvall()
 
     def __enter__(self, *a, **kw):
         return self
 
     @_autoclose
-    def __exit__(self, *a, **kw): pass
+    def __exit__(self, *a, **kw):
+        pass
+
 
 def proxy(port=9999):
     """Starts an ADB proxy on the specified port, for debugging purposes."""
     l = listen(port)
     l.wait_for_connection()
-    r = remote(context.adb_host, context.adb_port, level='debug')
+    r = remote(context.adb_host, context.adb_port, level="debug")
     l.connect_both(r)

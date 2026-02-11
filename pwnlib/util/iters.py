@@ -1,11 +1,10 @@
 """
 This module includes and extends the standard module :mod:`itertools`.
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import collections
-import copy
 import marshal
 import multiprocessing
 import operator
@@ -18,53 +17,54 @@ from pwnlib.context import context
 from pwnlib.log import getLogger
 
 __all__ = [
-    'bruteforce'                             ,
-    'mbruteforce'                            ,
-    'chained'                                ,
-    'consume'                                ,
-    'cyclen'                                 ,
-    'dotproduct'                             ,
-    'flatten'                                ,
-    'group'                                  ,
-    'iter_except'                            ,
-    'lexicographic'                          ,
-    'nth'                                    ,
-    'pad'                                    ,
-    'pairwise'                               ,
-    'powerset'                               ,
-    'quantify'                               ,
-    'random_combination'                     ,
-    'random_combination_with_replacement'    ,
-    'random_permutation'                     ,
-    'random_product'                         ,
-    'repeat_func'                            ,
-    'roundrobin'                             ,
-    'tabulate'                               ,
-    'take'                                   ,
-    'unique_everseen'                        ,
-    'unique_justseen'                        ,
-    'unique_window'                          ,
+    "bruteforce",
+    "mbruteforce",
+    "chained",
+    "consume",
+    "cyclen",
+    "dotproduct",
+    "flatten",
+    "group",
+    "iter_except",
+    "lexicographic",
+    "nth",
+    "pad",
+    "pairwise",
+    "powerset",
+    "quantify",
+    "random_combination",
+    "random_combination_with_replacement",
+    "random_permutation",
+    "random_product",
+    "repeat_func",
+    "roundrobin",
+    "tabulate",
+    "take",
+    "unique_everseen",
+    "unique_justseen",
+    "unique_window",
     # these are re-exported from itertools
-    'chain'                                  ,
-    'combinations'                           ,
-    'combinations_with_replacement'          ,
-    'compress'                               ,
-    'count'                                  ,
-    'cycle'                                  ,
-    'dropwhile'                              ,
-    'groupby'                                ,
-    'filterfalse'                            ,
-    'islice'                                 ,
-    'zip_longest'                            ,
-    'permutations'                           ,
-    'product'                                ,
-    'repeat'                                 ,
-    'starmap'                                ,
-    'takewhile'                              ,
-    'tee'
+    "chain",
+    "combinations",
+    "combinations_with_replacement",
+    "compress",
+    "count",
+    "cycle",
+    "dropwhile",
+    "groupby",
+    "filterfalse",
+    "islice",
+    "zip_longest",
+    "permutations",
+    "product",
+    "repeat",
+    "starmap",
+    "takewhile",
+    "tee",
 ]
 
 log = getLogger(__name__)
+
 
 def take(n, iterable):
     """take(n, iterable) -> list
@@ -94,7 +94,8 @@ def take(n, iterable):
     """
     return list(islice(iterable, n))
 
-def tabulate(func, start = 0):
+
+def tabulate(func, start=0):
     """tabulate(func, start = 0) -> iterator
 
     Arguments:
@@ -112,6 +113,7 @@ def tabulate(func, start = 0):
       [1, 4, 9, 16, 25]
     """
     return map(func, count(start))
+
 
 def consume(n, iterator):
     """consume(n, iterator)
@@ -147,12 +149,13 @@ def consume(n, iterator):
     # Use functions that consume iterators at C speed.
     if n is None:
         # feed the entire iterator into a zero-length deque
-        collections.deque(iterator, maxlen = 0)
+        collections.deque(iterator, maxlen=0)
     else:
         # advance to the empty slice starting at position n
         next(islice(iterator, n, n), None)
 
-def nth(n, iterable, default = None):
+
+def nth(n, iterable, default=None):
     """nth(n, iterable, default = None) -> object
 
     Returns the element at index `n` in `iterable`.  If `iterable` is a
@@ -181,7 +184,8 @@ def nth(n, iterable, default = None):
     """
     return next(islice(iterable, n, None), default)
 
-def quantify(iterable, pred = bool):
+
+def quantify(iterable, pred=bool):
     """quantify(iterable, pred = bool) -> int
 
     Count how many times the predicate `pred` is :const:`True`.
@@ -204,7 +208,8 @@ def quantify(iterable, pred = bool):
     """
     return sum(map(pred, iterable))
 
-def pad(iterable, value = None):
+
+def pad(iterable, value=None):
     """pad(iterable, value = None) -> iterator
 
     Pad an `iterable` with `value`, i.e. returns an iterator whoose elements are
@@ -232,6 +237,7 @@ def pad(iterable, value = None):
     """
     return chain(iterable, repeat(value))
 
+
 def cyclen(n, iterable):
     """cyclen(n, iterable) -> iterator
 
@@ -254,6 +260,7 @@ def cyclen(n, iterable):
     """
     return chain.from_iterable(repeat(tuple(iterable), n))
 
+
 def dotproduct(x, y):
     """dotproduct(x, y) -> int
 
@@ -273,6 +280,7 @@ def dotproduct(x, y):
       32
     """
     return sum(map(operator.mul, x, y))
+
 
 def flatten(xss):
     """flatten(xss) -> iterator
@@ -296,6 +304,7 @@ def flatten(xss):
       [43, 42, 41, 40, 0, 1]
     """
     return chain.from_iterable(xss)
+
 
 def repeat_func(func, *args, **kwargs):
     """repeat_func(func, *args, **kwargs) -> iterator
@@ -336,11 +345,10 @@ def repeat_func(func, *args, **kwargs):
       TypeError: f() takes exactly 0 arguments (1 given)
     """
     if kwargs:
-        return starmap(lambda args, kwargs: func(*args, **kwargs),
-                       repeat((args, kwargs))
-                       )
+        return starmap(lambda args, kwargs: func(*args, **kwargs), repeat((args, kwargs)))
     else:
         return starmap(func, repeat(args))
+
 
 def pairwise(iterable):
     """pairwise(iterable) -> iterator
@@ -364,7 +372,8 @@ def pairwise(iterable):
     next(b, None)
     return zip(a, b)
 
-def group(n, iterable, fill_value = None):
+
+def group(n, iterable, fill_value=None):
     """group(n, iterable, fill_value = None) -> iterator
 
     Similar to :func:`pwnlib.util.lists.group`, but returns an iterator and uses
@@ -389,7 +398,8 @@ def group(n, iterable, fill_value = None):
       ['ABC', 'DEF', 'Gxx']
     """
     args = [iter(iterable)] * n
-    return zip_longest(fillvalue = fill_value, *args)
+    return zip_longest(fillvalue=fill_value, *args)
+
 
 def roundrobin(*iterables):
     """roundrobin(*iterables)
@@ -421,7 +431,8 @@ def roundrobin(*iterables):
             pending -= 1
             nexts = cycle(islice(nexts, pending))
 
-def powerset(iterable, include_empty = True):
+
+def powerset(iterable, include_empty=True):
     """powerset(iterable, include_empty = True) -> iterator
 
     The powerset of an iterable.
@@ -446,7 +457,8 @@ def powerset(iterable, include_empty = True):
         next(i)
     return i
 
-def unique_everseen(iterable, key = None):
+
+def unique_everseen(iterable, key=None):
     """unique_everseen(iterable, key = None) -> iterator
 
     Get unique elements, preserving order. Remember all elements ever seen.  If
@@ -482,7 +494,8 @@ def unique_everseen(iterable, key = None):
                 seen_add(k)
                 yield element
 
-def unique_justseen(iterable, key = None):
+
+def unique_justseen(iterable, key=None):
     """unique_everseen(iterable, key = None) -> iterator
 
     Get unique elements, preserving order. Remember only the elements just seen.
@@ -507,7 +520,8 @@ def unique_justseen(iterable, key = None):
     """
     return map(next, map(operator.itemgetter(1), groupby(iterable, key)))
 
-def unique_window(iterable, window, key = None):
+
+def unique_window(iterable, window, key=None):
     """unique_everseen(iterable, window, key = None) -> iterator
 
     Get unique elements, preserving order. Remember only the last `window`
@@ -533,7 +547,7 @@ def unique_window(iterable, window, key = None):
       >>> ''.join(unique_window('ABBCcAD', 4, str.lower))
       'ABCAD'
     """
-    seen = collections.deque(maxlen = window)
+    seen = collections.deque(maxlen=window)
     seen_add = seen.append
     if key is None:
         for element in iterable:
@@ -546,6 +560,7 @@ def unique_window(iterable, window, key = None):
             if k not in seen:
                 yield element
             seen_add(k)
+
 
 def iter_except(func, exception):
     """iter_except(func, exception)
@@ -584,6 +599,7 @@ def iter_except(func, exception):
     except exception:
         pass
 
+
 def random_product(*args, **kwargs):
     """random_product(*args, repeat = 1) -> tuple
 
@@ -603,15 +619,16 @@ def random_product(*args, **kwargs):
       >>> random_product(*args, repeat = 2) in product(*args, repeat = 2)
       True
     """
-    repeat = kwargs.pop('repeat', 1)
+    repeat = kwargs.pop("repeat", 1)
 
     if kwargs != {}:
-        raise TypeError('random_product() does not support argument %s' % kwargs.popitem())
+        raise TypeError("random_product() does not support argument %s" % kwargs.popitem())
 
     pools = list(map(tuple, args)) * repeat
     return tuple(random.choice(pool) for pool in pools)
 
-def random_permutation(iterable, r = None):
+
+def random_permutation(iterable, r=None):
     """random_product(iterable, r = None) -> tuple
 
     Arguments:
@@ -632,6 +649,7 @@ def random_permutation(iterable, r = None):
     pool = tuple(iterable)
     r = len(pool) if r is None else r
     return tuple(random.sample(pool, r))
+
 
 def random_combination(iterable, r):
     """random_combination(iterable, r) -> tuple
@@ -654,6 +672,7 @@ def random_combination(iterable, r):
     n = len(pool)
     indices = sorted(random.sample(range(n), r))
     return tuple(pool[i] for i in indices)
+
 
 def random_combination_with_replacement(iterable, r):
     """random_combination(iterable, r) -> tuple
@@ -700,8 +719,9 @@ def lexicographic(alphabet):
       ['', '0', '1', '00', '01', '10', '11', '000']
     """
     for n in count():
-        for e in product(alphabet, repeat = n):
+        for e in product(alphabet, repeat=n):
             yield e
+
 
 def chained(func):
     """chained(func)
@@ -730,13 +750,16 @@ def chained(func):
       >>> list(g2())
       [0, 0, 1, -1, 2, -2]
     """
+
     def wrapper(*args, **kwargs):
         for xs in func(*args, **kwargs):
             for x in xs:
                 yield x
+
     return wrapper
 
-def bruteforce(func, alphabet, length, method = 'upto', start = None, databag = None):
+
+def bruteforce(func, alphabet, length, method="upto", start=None, databag=None):
     """bruteforce(func, alphabet, length, method = 'upto', start = None)
 
     Bruteforce `func` to return :const:`True`.  `func` should take a string
@@ -767,23 +790,23 @@ def bruteforce(func, alphabet, length, method = 'upto', start = None, databag = 
       'yes'
     """
 
-    if   method == 'upto' and length > 1:
-        iterator = product(alphabet, repeat = 1)
+    if method == "upto" and length > 1:
+        iterator = product(alphabet, repeat=1)
         for i in range(2, length + 1):
-            iterator = chain(iterator, product(alphabet, repeat = i))
+            iterator = chain(iterator, product(alphabet, repeat=i))
 
-    elif method == 'downfrom' and length > 1:
-        iterator = product(alphabet, repeat = length)
+    elif method == "downfrom" and length > 1:
+        iterator = product(alphabet, repeat=length)
         for i in range(length - 1, 1, -1):
-            iterator = chain(iterator, product(alphabet, repeat = i))
+            iterator = chain(iterator, product(alphabet, repeat=i))
 
-    elif method == 'fixed':
-        iterator = product(alphabet, repeat = length)
+    elif method == "fixed":
+        iterator = product(alphabet, repeat=length)
 
     else:
-        raise TypeError('bruteforce(): unknown method')
+        raise TypeError("bruteforce(): unknown method")
 
-    if method == 'fixed':
+    if method == "fixed":
         total_iterations = len(alphabet) ** length
     else:
         total_iterations = (len(alphabet) ** (length + 1) // (len(alphabet) - 1)) - 1
@@ -791,7 +814,7 @@ def bruteforce(func, alphabet, length, method = 'upto', start = None, databag = 
     if start is not None:
         i, N = start
         if i > N:
-            raise ValueError('bruteforce(): invalid starting point')
+            raise ValueError("bruteforce(): invalid starting point")
 
         i -= 1
         chunk_size = total_iterations // N
@@ -811,12 +834,12 @@ def bruteforce(func, alphabet, length, method = 'upto', start = None, databag = 
 
         total_iterations = chunk_size
 
-    h = log.waitfor('Bruteforcing')
+    h = log.waitfor("Bruteforcing")
     cur_iteration = 0
     if start is not None:
         consume(i, iterator)
     for e in iterator:
-        cur = ''.join(e)
+        cur = "".join(e)
         cur_iteration += 1
         if cur_iteration % 2000 == 0:
             progress = 100.0 * cur_iteration / total_iterations
@@ -832,12 +855,12 @@ def bruteforce(func, alphabet, length, method = 'upto', start = None, databag = 
         if start is not None:
             consume(N - 1, iterator)
 
-    h.failure('No matches found')
+    h.failure("No matches found")
 
 
 def _mbruteforcewrap(func, alphabet, length, method, start, databag):
     oldloglevel = context.log_level
-    context.log_level = 'critical'
+    context.log_level = "critical"
     res = bruteforce(func, alphabet, length, method=method, start=start, databag=databag)
     context.log_level = oldloglevel
     databag["result"] = res
@@ -875,23 +898,25 @@ class PicklableFunc:
         # nor
         #   def __reduce__(self): return "FunctionType"
         # works because of checks for identity :(
-        globs = CustomPickler(vars, (CustomPickler(__import__, (self.f.__module__ or '__main__',)),))
-        return type(self), (CustomPickler(
-            construct_func,  # ideally self.f.__class__
-                             # but types.FunctionType tries to be __main__.function
-            (
-                CustomPickler(marshal.loads, (marshal.dumps(self.f.__code__),)),
-                globs,
-                self.f.__name__,
-                self.f.__defaults__,
-                self.f.__closure__,
-                self.f.__kwdefaults__,
+        globs = CustomPickler(vars, (CustomPickler(__import__, (self.f.__module__ or "__main__",)),))
+        return type(self), (
+            CustomPickler(
+                construct_func,  # ideally self.f.__class__
+                # but types.FunctionType tries to be __main__.function
+                (
+                    CustomPickler(marshal.loads, (marshal.dumps(self.f.__code__),)),
+                    globs,
+                    self.f.__name__,
+                    self.f.__defaults__,
+                    self.f.__closure__,
+                    self.f.__kwdefaults__,
+                ),
+                self.f.__dict__,
             ),
-            self.f.__dict__,
-        ),)
+        )
 
 
-def mbruteforce(func, alphabet, length, method = 'upto', start = None, threads = None):
+def mbruteforce(func, alphabet, length, method="upto", start=None, threads=None):
     """mbruteforce(func, alphabet, length, method = 'upto', start = None, threads = None)
 
     Same functionality as bruteforce(), but multithreaded.
@@ -924,7 +949,7 @@ def mbruteforce(func, alphabet, length, method = 'upto', start = None, threads =
         except NotImplementedError:
             threads = 1
 
-    h = log.waitfor('MBruteforcing')
+    h = log.waitfor("MBruteforcing")
     processes = [None] * threads
     shareddata = [None] * threads
 
@@ -936,30 +961,29 @@ def mbruteforce(func, alphabet, length, method = 'upto', start = None, threads =
 
     for i in range(threads):
         shareddata[i] = multiprocessing.Manager().dict()
-        shareddata[i]['result'] = None
-        shareddata[i]['current_item'] = ""
-        shareddata[i]['items_done'] = 0
-        shareddata[i]['items_total'] = 0
+        shareddata[i]["result"] = None
+        shareddata[i]["current_item"] = ""
+        shareddata[i]["items_done"] = 0
+        shareddata[i]["items_total"] = 0
 
-        chunkid = (i2-1) + (i * N2) + 1
+        chunkid = (i2 - 1) + (i * N2) + 1
 
-        processes[i] = multiprocessing.Process(target=_mbruteforcewrap,
-                args=(func, alphabet, length, method, (chunkid, totalchunks),
-                        shareddata[i]))
+        processes[i] = multiprocessing.Process(
+            target=_mbruteforcewrap, args=(func, alphabet, length, method, (chunkid, totalchunks), shareddata[i])
+        )
         processes[i].start()
 
     done = False
 
     while not done:
         # log status
-        current_item_list = ",".join(["\"%s\"" % x["current_item"]
-                                for x in shareddata if x is not None])
+        current_item_list = ",".join(['"%s"' % x["current_item"] for x in shareddata if x is not None])
         items_done = sum([x["items_done"] for x in shareddata if x is not None])
         items_total = sum([x["items_total"] for x in shareddata if x is not None])
 
         progress = 100.0 * items_done / items_total if items_total != 0 else 0.0
 
-        h.status('Trying %s -- %0.3f%%' % (current_item_list, progress))
+        h.status("Trying %s -- %0.3f%%" % (current_item_list, progress))
 
         # handle finished threads
         for i in range(threads):
@@ -982,4 +1006,4 @@ def mbruteforce(func, alphabet, length, method = 'upto', start = None, threads =
                 if all([x is None for x in processes]):
                     done = True
         time.sleep(0.3)
-    h.failure('No matches found')
+    h.failure("No matches found")

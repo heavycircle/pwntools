@@ -17,19 +17,17 @@ This doctest is to ensure that the known data are accurate:
     >>> known.all_crcs == known.generate()
     True
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import sys
 import types
 
-from pwnlib.util import fiddling
-from pwnlib.util import packing
-from pwnlib.util import safeeval
+from pwnlib.util import fiddling, packing, safeeval
 from pwnlib.util.crc import known
 
 
-class BitPolynom(object):
+class BitPolynom:
     """Class for representing GF(2)[X], i.e. the field of polynomials over
     GF(2).
 
@@ -70,16 +68,16 @@ class BitPolynom(object):
         ValueError: Not a valid polynomial: y
     """
 
-
     def __init__(self, n):
         if isinstance(n, (bytes, bytearray, str)):
             from pwnlib.util.packing import _need_text
+
             n = _need_text(n)
             self.n = 0
             x = BitPolynom(2)
             try:
-                for p in n.split('+'):
-                    k = safeeval.values(p.strip(), {'x': x, 'X': x})
+                for p in n.split("+"):
+                    k = safeeval.values(p.strip(), {"x": x, "X": x})
                     assert isinstance(k, (BitPolynom, int))
                     k = int(k)
                     assert k >= 0
@@ -161,10 +159,12 @@ class BitPolynom(object):
 
     def __div__(self, other):
         return divmod(self, other)[0]
+
     __floordiv__ = __div__
 
     def __rdiv__(self, other):
         return divmod(other, self)[0]
+
     __rfloordiv__ = __rdiv__
 
     __floordiv__ = __div__
@@ -221,11 +221,11 @@ class BitPolynom(object):
             >>> BitPolynom(1 << 10).degree()
             10
         """
-        return max(0, int(self).bit_length()-1)
+        return max(0, int(self).bit_length() - 1)
 
     def __repr__(self):
         if int(self) == 0:
-            return '0'
+            return "0"
 
         out = []
         for n in range(self.degree(), 1, -1):
@@ -235,29 +235,42 @@ class BitPolynom(object):
             out.append("x")
         if int(self) & 1:
             out.append("1")
-        return 'BitPolynom(%r)' % ' + '.join(out)
+        return "BitPolynom(%r)" % " + ".join(out)
+
 
 class Module(types.ModuleType):
     def __init__(self):
         super(Module, self).__init__(__name__)
         self._cached_crcs = None
         self.BitPolynom = BitPolynom
-        self.__dict__.update({
-            '__file__'    : __file__,
-            '__package__' : __package__,
-        })
+        self.__dict__.update(
+            {
+                "__file__": __file__,
+                "__package__": __package__,
+            }
+        )
 
     def __getattr__(self, attr):
         crcs = known.all_crcs
 
-        if attr == '__all__':
-            return ['BitPolynom', 'generic_crc', 'cksum', 'find_crc_function'] + sorted(crcs.keys())
+        if attr == "__all__":
+            return ["BitPolynom", "generic_crc", "cksum", "find_crc_function"] + sorted(crcs.keys())
 
         info = crcs.get(attr, None)
         if not info:
             raise AttributeError("'module' object has no attribute %r" % attr)
 
-        func = self._make_crc(info['name'], info['poly'], info['width'], info['init'], info['refin'], info['refout'], info['xorout'], info['check'], 'See also: ' + info['link'])
+        func = self._make_crc(
+            info["name"],
+            info["poly"],
+            info["width"],
+            info["init"],
+            info["refin"],
+            info["refout"],
+            info["xorout"],
+            info["check"],
+            "See also: " + info["link"],
+        )
 
         setattr(self, attr, func)
 
@@ -289,23 +302,23 @@ class Module(types.ModuleType):
         if polynom.degree() != width:
             raise ValueError("Polynomial is too large for that width")
 
-        init   &= (1 << width)-1
-        xorout &= (1 << width)-1
+        init &= (1 << width) - 1
+        xorout &= (1 << width) - 1
 
         if isinstance(data, list):
             # refin is not meaningful in this case
             inlen = len(data)
-            p = BitPolynom(int(''.join('1' if v else '0' for v in data), 2))
+            p = BitPolynom(int("".join("1" if v else "0" for v in data), 2))
         elif isinstance(data, bytes):
-            inlen = len(data)*8
+            inlen = len(data) * 8
             if refin:
                 data = fiddling.bitswap(data)
-            p = BitPolynom(packing.unpack(data, 'all', endian='big', sign=False))
+            p = BitPolynom(packing.unpack(data, "all", endian="big", sign=False))
         else:
             raise ValueError("Don't know how to crc %s()" % type(data).__name__)
         p = p << width
         p ^= init << inlen
-        p  = p % polynom
+        p = p % polynom
         res = p.n
         if refout:
             res = fiddling.bitswap_int(res, width)
@@ -314,14 +327,15 @@ class Module(types.ModuleType):
         return res
 
     @staticmethod
-    def _make_crc(name, polynom, width, init, refin, refout, xorout, check, extra_doc = ''):
+    def _make_crc(name, polynom, width, init, refin, refout, xorout, check, extra_doc=""):
         def inner(data):
             return crc.generic_crc(data, polynom, width, init, refin, refout, xorout)
-        inner.func_name = 'crc_' + name
-        inner.__name__  = 'crc_' + name
-        inner.__qualname__  = 'crc_' + name
 
-        inner.__doc__   = """%s(data) -> int
+        inner.func_name = "crc_" + name
+        inner.__name__ = "crc_" + name
+        inner.__qualname__ = "crc_" + name
+
+        inner.__doc__ = """%s(data) -> int
 
         Calculates the %s checksum.
 
@@ -363,7 +377,7 @@ class Module(types.ModuleType):
         """
 
         l = len(data)
-        data += packing.pack(l, 'all', endian='little', sign=False)
+        data += packing.pack(l, "all", endian="little", sign=False)
         return crc.crc_32_cksum(data)
 
     @staticmethod

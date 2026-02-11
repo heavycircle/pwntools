@@ -2,15 +2,14 @@
 # http://www.iodigitalsec.com/python-cascading-xor-polymorphic-shellcode-generator/
 #
 # License:
-#; Title Python XOR Shellcode Encoder
-#; Author npn <npn at iodigitalsec dot com>
-#; License http://creativecommons.org/licenses/by-sa/3.0/
-#; Legitimate use and research only
-#; This program is distributed in the hope that it will be useful,
-#; but WITHOUT ANY WARRANTY; without even the implied warranty of
-#; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-from __future__ import absolute_import
-from __future__ import division
+# ; Title Python XOR Shellcode Encoder
+# ; Author npn <npn at iodigitalsec dot com>
+# ; License http://creativecommons.org/licenses/by-sa/3.0/
+# ; Legitimate use and research only
+# ; This program is distributed in the hope that it will be useful,
+# ; but WITHOUT ANY WARRANTY; without even the implied warranty of
+# ; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+from __future__ import annotations
 
 from pwnlib import shellcraft
 from pwnlib.asm import asm
@@ -19,8 +18,8 @@ from pwnlib.encoders.encoder import Encoder
 from pwnlib.util.fiddling import xor_pair
 from pwnlib.util.lists import group
 
-
 # Note shellcode assumes it's based at ecx
+
 
 class i386XorEncoder(Encoder):
     r"""Generates an XOR decoder for i386.
@@ -38,11 +37,11 @@ class i386XorEncoder(Encoder):
     b'\xd9\xd0\xd9t$\xf4^\xfcj\x07Y\x83\xc6\x19\x89\xf7\xad\x93\xad1\xd8\xabIu\xf7\x00\x00\x00\x00h\x01\x01\x01\x00\x00\x00\x00\x01\x814$\x00\x00\x00\x00.ri\x01\x00\x00\x00\x00h/bi\x00\x00\x00\x01n\x89\xe30\x00\x01\x00\x00\xc90\xd2j\x00\x00\x00\x00\x0bX\xcd\x80'
     """
 
-    arch = 'i386'
+    arch = "i386"
 
     stub = None
 
-    decoder = '''
+    decoder = """
 start:
     fnop
     fnstenv [esp-0xc]
@@ -61,17 +60,17 @@ loop:
     dec ecx
     jnz loop
 end:
-'''
+"""
 
-    blacklist = set('\x14$1I^tu\x83\x89\x93\xab\xad\xc6\xd8\xd9\xf4\xf7\xfc')
+    blacklist = set("\x14$1I^tu\x83\x89\x93\xab\xad\xc6\xd8\xd9\xf4\xf7\xfc")
 
-    def __call__(self, raw_bytes, avoid, pcreg=''):
+    def __call__(self, raw_bytes, avoid, pcreg=""):
         while len(raw_bytes) % context.bytes:
-            raw_bytes += b'\x00'
+            raw_bytes += b"\x00"
 
         a, b = xor_pair(raw_bytes, avoid)
 
-        mov_ecx = shellcraft.i386.mov('ecx', len(raw_bytes) // context.bytes)
+        mov_ecx = shellcraft.i386.mov("ecx", len(raw_bytes) // context.bytes)
         decoder = self.decoder % mov_ecx
         decoder = asm(decoder)
 
@@ -80,5 +79,6 @@ end:
             decoder += right
 
         return decoder
+
 
 encode = i386XorEncoder()

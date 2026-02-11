@@ -1,15 +1,14 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import errno
 import socket
 
 from pwnlib.context import context
 from pwnlib.log import getLogger
-from pwnlib.timeout import Timeout
 from pwnlib.tubes.sock import sock
 
 log = getLogger(__name__)
+
 
 class listen(sock):
     r"""Creates an TCP or UDP-socket to receive data on. It supports
@@ -38,7 +37,7 @@ class listen(sock):
 
         .. doctest::
             :options: +POSIX +TODO
-            
+
             >>> # It works with ipv4 by default
             >>> l = listen()
             >>> l.spawn_process('/bin/sh')
@@ -79,8 +78,7 @@ class listen(sock):
 
     _accepter = None
 
-    def __init__(self, port=0, bindaddr='::',
-                 fam='any', typ='tcp', *args, **kwargs):
+    def __init__(self, port=0, bindaddr="::", fam="any", typ="tcp", *args, **kwargs):
         super(listen, self).__init__(*args, **kwargs)
 
         # convert port to string for sagemath support
@@ -89,10 +87,10 @@ class listen(sock):
         fam = self._get_family(fam)
         typ = self._get_type(typ)
 
-        if fam == socket.AF_INET and bindaddr == '::':
-            bindaddr = '0.0.0.0'
+        if fam == socket.AF_INET and bindaddr == "::":
+            bindaddr = "0.0.0.0"
 
-        h = self.waitfor('Trying to bind to %s on port %s' % (bindaddr, port))
+        h = self.waitfor("Trying to bind to %s on port %s" % (bindaddr, port))
 
         for res in socket.getaddrinfo(bindaddr, port, fam, typ, 0, socket.AI_PASSIVE):
             self.family, self.type, self.proto, self.canonname, self.sockaddr = res
@@ -106,7 +104,7 @@ class listen(sock):
             if self.family == socket.AF_INET6:
                 try:
                     listen_sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, fam == socket.AF_INET6)
-                except (socket.error, AttributeError):
+                except (OSError, AttributeError):
                     self.warn("could not set socket to accept also IPV4")
             listen_sock.bind(self.sockaddr)
             self.lhost, self.lport = listen_sock.getsockname()[:2]
@@ -119,7 +117,7 @@ class listen(sock):
 
         h.success()
 
-        h = self.waitfor('Waiting for connections on %s:%s' % (self.lhost, self.lport))
+        h = self.waitfor("Waiting for connections on %s:%s" % (self.lhost, self.lport))
 
         def accepter():
             while True:
@@ -134,7 +132,7 @@ class listen(sock):
                         self.unrecv(data)
                     self.settimeout(self.timeout)
                     break
-                except socket.error as e:
+                except OSError as e:
                     if e.errno == errno.EINTR:
                         continue
                     h.failure()
@@ -143,9 +141,9 @@ class listen(sock):
                     return
 
             self.rhost, self.rport = rhost[:2]
-            h.success('Got connection from %s on port %d' % (self.rhost, self.rport))
+            h.success("Got connection from %s on port %d" % (self.rhost, self.rport))
 
-        self._accepter = context.Thread(target = accepter)
+        self._accepter = context.Thread(target=accepter)
         self._accepter.daemon = True
         self._accepter.start()
 
@@ -156,7 +154,8 @@ class listen(sock):
             p = super(listen, self).spawn_process(*args, **kwargs)
             p.wait()
             self.close()
-        t = context.Thread(target = accepter)
+
+        t = context.Thread(target=accepter)
         t.daemon = True
         t.start()
 
@@ -168,15 +167,15 @@ class listen(sock):
     @property
     def sock(self):
         try:
-            return self.__dict__['sock']
+            return self.__dict__["sock"]
         except KeyError:
             pass
         self._accepter.join(timeout=self.timeout)
-        return self.__dict__.get('sock')
+        return self.__dict__.get("sock")
 
     @sock.setter
     def sock(self, s):
-        self.__dict__['sock'] = s
+        self.__dict__["sock"] = s
 
     def close(self):
         # since `close` is scheduled to run on exit we must check that we got

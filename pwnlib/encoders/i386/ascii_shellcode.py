@@ -1,21 +1,18 @@
-""" Encoder to convert shellcode to shellcode that contains only ascii
-characters """
+"""Encoder to convert shellcode to shellcode that contains only ascii
+characters"""
 # https://github.com/Gallopsled/pwntools/pull/1667
-
-from __future__ import absolute_import
+from __future__ import annotations
 
 from itertools import product
 
-from pwnlib.context import LocalContext
-from pwnlib.context import context
-from pwnlib.encoders.encoder import Encoder
-from pwnlib.encoders.encoder import all_chars
+from pwnlib.context import LocalContext, context
+from pwnlib.encoders.encoder import Encoder, all_chars
 from pwnlib.util.iters import group
 from pwnlib.util.packing import *
 
 
 class AsciiShellcodeEncoder(Encoder):
-    """ Pack shellcode into only ascii characters that unpacks itself and
+    """Pack shellcode into only ascii characters that unpacks itself and
     executes (on the stack)
 
     The original paper this encoder is based on:
@@ -26,7 +23,7 @@ class AsciiShellcodeEncoder(Encoder):
     """
 
     def __init__(self, slop=20, max_subs=4):
-        """ Init
+        """Init
 
         Args:
             slop (int, optional): The amount esp will be increased by in the
@@ -47,7 +44,7 @@ class AsciiShellcodeEncoder(Encoder):
 
     @LocalContext
     def __call__(self, raw_bytes, avoid=None, pcreg=None):
-        r""" Pack shellcode into only ascii characters that unpacks itself and
+        r"""Pack shellcode into only ascii characters that unpacks itself and
         executes (on the stack)
 
         Args:
@@ -87,33 +84,34 @@ class AsciiShellcodeEncoder(Encoder):
         """
         if not avoid:
             vocab = bytearray(
-                b"!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")
+                b"!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+            )
         else:
-            required_chars = set('\\-%TXP')
+            required_chars = set("\\-%TXP")
             allowed = set(all_chars)
             if avoid.intersection(required_chars):
                 raise RuntimeError(
-                    '''These characters ({}) are required because they assemble
-                    into instructions used to unpack the shellcode'''.format(
-                        str(required_chars, 'ascii')))
+                    """These characters ({}) are required because they assemble
+                    into instructions used to unpack the shellcode""".format(str(required_chars, "ascii"))
+                )
             allowed.difference_update(avoid)
             vocab = bytearray(map(ord, allowed))
 
-        if context.arch != 'i386' or context.bits != 32:
-            raise RuntimeError('Only 32-bit i386 is currently supported')
+        if context.arch != "i386" or context.bits != 32:
+            raise RuntimeError("Only 32-bit i386 is currently supported")
 
         int_size = context.bytes
 
         # Prepend with NOPs for the NOP sled
-        shellcode = bytearray(b'\x90'*int_size + raw_bytes)
+        shellcode = bytearray(b"\x90" * int_size + raw_bytes)
         subtractions = self._get_subtractions(shellcode, vocab)
         allocator = self._get_allocator(len(subtractions) + self.slop, vocab)
-        nop_sled = b'P' * self.slop  # push eax
+        nop_sled = b"P" * self.slop  # push eax
         return bytes(allocator + subtractions + nop_sled)
 
     @LocalContext
     def _get_allocator(self, size, vocab):
-        r""" Allocate enough space on the stack for the shellcode
+        r"""Allocate enough space on the stack for the shellcode
 
         int_size is taken from the context
 
@@ -131,30 +129,29 @@ class AsciiShellcodeEncoder(Encoder):
             >>> encoders.i386.ascii_shellcode.encode._get_allocator(300, vocab)
             bytearray(b'TX-!!!!-!_``-t~~~P\\%!!!!%@@@@')
         """
-        size += 0x1e  # add typical allocator size
+        size += 0x1E  # add typical allocator size
         int_size = context.bytes
         # Use eax for subtractions because sub esp, X doesn't assemble to ascii
-        result = bytearray(b'TX')  # push esp; pop eax
+        result = bytearray(b"TX")  # push esp; pop eax
         # Set target to the `size` arg
         target = bytearray(pack(size))
         # All we are doing here is adding (subtracting) `size`
         # to esp (to allocate space on the stack), so we don't care
         # about esp's actual value. That's why the `last` parameter
         # for `calc_subtractions` can just be zero
-        for subtraction in self._calc_subtractions(
-                bytearray(int_size), target, vocab):
+        for subtraction in self._calc_subtractions(bytearray(int_size), target, vocab):
             # sub eax, subtraction
-            result += b'-' + subtraction
-        result += b'P\\'  # push eax, pop esp
+            result += b"-" + subtraction
+        result += b"P\\"  # push eax, pop esp
         # Zero out eax for the unpacking part
         pos, neg = self._find_negatives(vocab)
         # and eax, pos; and eax, neg ; (0b00010101 & 0b00101010 = 0b0)
-        result += flat((b'%', pos, b'%', neg))
+        result += flat((b"%", pos, b"%", neg))
         return result
 
     @LocalContext
     def _find_negatives(self, vocab):
-        r""" Find two bitwise negatives in the vocab so that when they are
+        r"""Find two bitwise negatives in the vocab so that when they are
         and-ed the result is 0.
 
         int_size is taken from the context
@@ -183,16 +180,14 @@ class AsciiShellcodeEncoder(Encoder):
             if products[0] & products[1] == 0:
                 return tuple(
                     # pylint: disable=undefined-variable
-                    unpack(p8(x)*int_size)  # noqa: F405
+                    unpack(p8(x) * int_size)  # noqa: F405
                     for x in bytearray(products)
                 )
-        else:
-            raise ArithmeticError(
-                'Could not find two bitwise negatives in the provided vocab')
+        raise ArithmeticError("Could not find two bitwise negatives in the provided vocab")
 
     @LocalContext
     def _get_subtractions(self, shellcode, vocab):
-        r""" Covert the sellcode to sub eax and posh eax instructions
+        r"""Covert the sellcode to sub eax and posh eax instructions
 
         int_size is taken from the context
 
@@ -222,14 +217,14 @@ class AsciiShellcodeEncoder(Encoder):
         # Pack the shellcode to a sub/push sequence
         for x in sc:
             for subtraction in self._calc_subtractions(last, x, vocab):
-                result += b'-' + subtraction  # sub eax, ...
+                result += b"-" + subtraction  # sub eax, ...
             last = x
-            result += b'P'  # push eax
+            result += b"P"  # push eax
         return result
 
     @LocalContext
     def _calc_subtractions(self, last, target, vocab):
-        r""" Given `target` and `last`, return a list of integers that when
+        r"""Given `target` and `last`, return a list of integers that when
          subtracted from `last` will equal `target` while only constructing
          integers from bytes in `vocab`
 
@@ -266,15 +261,13 @@ class AsciiShellcodeEncoder(Encoder):
                 # `max_subs` is 4 and we're on the second subtraction attempt,
                 # products will equal
                 # [\, ", #, %, ...], [\, ", #, %, ...], (0,), (0,)
-                for products in product(
-                    *[x <= sub and vocab or (0,) for x in range(self.max_subs)]
-                ):
+                for products in product(*[x <= sub and vocab or (0,) for x in range(self.max_subs)]):
                     # Sum up all the products, carry from last byte and
                     # the target
                     attempt = target[byte] + carry + sum(products)
                     # If the attempt equals last, we've found the combination
-                    if last[byte] == attempt & 0xff:
-                        carry = (attempt & 0xff00) >> 8
+                    if last[byte] == attempt & 0xFF:
+                        carry = (attempt & 0xFF00) >> 8
                         # Update the result with the current `products`
                         for p, i in zip(products, range(sub + 1)):
                             subtractions[i][byte] = p
@@ -284,12 +277,14 @@ class AsciiShellcodeEncoder(Encoder):
                 return subtractions
             else:
                 subtractions.append(bytearray(int_size))
-        else:
-            raise ArithmeticError(
-                str.format(
-                    '''Could not find the correct subtraction sequence
-                to get the the desired target ({}) from ({})''',
-                    target[byte], last[byte]))
+        raise ArithmeticError(
+            str.format(
+                """Could not find the correct subtraction sequence
+                to get the the desired target ({}) from ({})""",
+                target[byte],
+                last[byte],
+            )
+        )
 
 
 encode = AsciiShellcodeEncoder()

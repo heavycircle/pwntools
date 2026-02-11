@@ -19,37 +19,34 @@ Or adding the following lines to ~/.pwn.conf (or system-wide /etc/pwn.conf):
     interval=never
 
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import datetime
-import json
 import os
 import time
 
 import packaging.version
 
-from pwnlib.args import args
 from pwnlib.config import register_config
 from pwnlib.context import context
 from pwnlib.log import getLogger
-from pwnlib.util.misc import read
-from pwnlib.util.misc import write
-from pwnlib.util.web import wget
+from pwnlib.util.misc import read, write
 from pwnlib.version import __version__
 
 log = getLogger(__name__)
 
 current_version = packaging.version.Version(__version__)
-package_name    = 'pwntools'
-package_repo    = 'Gallopsled/pwntools'
-update_freq     = datetime.timedelta(days=7).total_seconds()
-disabled        = False
+package_name = "pwntools"
+package_repo = "Gallopsled/pwntools"
+update_freq = datetime.timedelta(days=7).total_seconds()
+disabled = False
+
 
 def read_update_config(settings):
     for key, value in settings.items():
-        if key == 'interval':
-            if value == 'never':
+        if key == "interval":
+            if value == "never":
                 global disabled
                 disabled = True
             else:
@@ -61,9 +58,11 @@ def read_update_config(settings):
                     global update_freq
                     update_freq = datetime.timedelta(days=value).total_seconds()
         else:
-            log.warn("Unknown configuration option %r in section %r" % (key, 'update'))
+            log.warn("Unknown configuration option %r in section %r" % (key, "update"))
 
-register_config('update', read_update_config)
+
+register_config("update", read_update_config)
+
 
 def available_on_pypi(prerelease=current_version.is_prerelease):
     """Return True if an update is available on PyPI.
@@ -76,11 +75,11 @@ def available_on_pypi(prerelease=current_version.is_prerelease):
     # Deferred import to save startup time
     import requests
 
-    versions = getattr(available_on_pypi, 'cached', None)
+    versions = getattr(available_on_pypi, "cached", None)
     if versions is None:
-        response = requests.get("https://pypi.org/simple/pwntools/",
-                                headers={"Accept": "application/vnd.pypi.simple.v1+json"},
-                                timeout=5)
+        response = requests.get(
+            "https://pypi.org/simple/pwntools/", headers={"Accept": "application/vnd.pypi.simple.v1+json"}, timeout=5
+        )
         response.raise_for_status()
         versions = response.json()["versions"]
         available_on_pypi.cached = versions
@@ -92,6 +91,7 @@ def available_on_pypi(prerelease=current_version.is_prerelease):
 
     return max(versions)
 
+
 def cache_file():
     """Returns the path of the file used to cache update data, and ensures that it exists."""
     cache_dir = context.cache_dir
@@ -99,15 +99,16 @@ def cache_file():
     if not cache_dir:
         return None
 
-    cache_file = os.path.join(cache_dir, 'update')
+    cache_file = os.path.join(cache_dir, "update")
 
     if not os.path.isdir(cache_dir):
         os.makedirs(cache_dir)
 
     if not os.path.exists(cache_file):
-        write(cache_file, '')
+        write(cache_file, "")
 
     return cache_file
+
 
 def last_check():
     """Return the date of the last check"""
@@ -118,6 +119,7 @@ def last_check():
     # Fallback
     return time.time()
 
+
 def should_check():
     """Return True if we should check for an update"""
     filename = cache_file()
@@ -125,10 +127,11 @@ def should_check():
     if not filename:
         return False
 
-    if disabled or read(filename).strip() == b'never':
+    if disabled or read(filename).strip() == b"never":
         return False
 
     return time.time() > (last_check() + update_freq)
+
 
 def perform_check(prerelease=current_version.is_prerelease):
     """Perform the update check, and report to the user.
@@ -174,35 +177,38 @@ def perform_check(prerelease=current_version.is_prerelease):
         log.info("You have the latest version of Pwntools (%s)" % best)
         return
 
-    command = [
-        'pip',
-        'install',
-        '-U'
-    ]
+    command = ["pip", "install", "-U"]
 
     if best == pypi:
-        where = 'pypi'
+        where = "pypi"
         pypi_package = package_name
         if best.is_prerelease:
-            pypi_package += '==%s' % (best)
+            pypi_package += "==%s" % (best)
         command += [pypi_package]
 
-    command_str = ' '.join(command)
+    command_str = " ".join(command)
 
-    log.info("A newer version of %s is available on %s (%s --> %s).\n" % (package_name, where, current_version, best) +
-             "Update with: $ %s" % command_str)
+    log.info(
+        "A newer version of %s is available on %s (%s --> %s).\n" % (package_name, where, current_version, best)
+        + "Update with: $ %s" % command_str
+    )
 
     return command
 
+
 def check_automatically():
-    xdg_config_home = os.environ.get('XDG_CONFIG_HOME') or "~/.config"
+    xdg_config_home = os.environ.get("XDG_CONFIG_HOME") or "~/.config"
 
     if should_check():
-        message  = ["Checking for new versions of %s" % package_name]
+        message = ["Checking for new versions of %s" % package_name]
         message += ["To disable this functionality, set the contents of %s to 'never' (old way)." % cache_file()]
-        message += ["Or add the following lines to ~/.pwn.conf or %s/pwn.conf (or /etc/pwn.conf system-wide):" % xdg_config_home]
-        message += ["""\
+        message += [
+            "Or add the following lines to ~/.pwn.conf or %s/pwn.conf (or /etc/pwn.conf system-wide):" % xdg_config_home
+        ]
+        message += [
+            """\
     [update]
-    interval=never"""]
+    interval=never"""
+        ]
         log.info("\n".join(message))
         perform_check()

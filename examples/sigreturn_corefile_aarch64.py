@@ -1,19 +1,21 @@
+from __future__ import annotations
+
 from pwn import *
-context.arch='aarch64'
+
+context.arch = "aarch64"
 frame = SigreturnFrame()
 
-registers = ['x%i' % i for i in range(0, 31)]
-registers += ['pc']
+registers = ["x%i" % i for i in range(0, 31)]
+registers += ["pc"]
 
 
 for index, register in enumerate(registers):
     setattr(frame, register, index)
 frame.sp = 64
 
-assembly = '\n'.join([
-    shellcraft.read(constants.STDIN_FILENO, 'sp', 1024),
-    shellcraft.syscall(constants.SYS_rt_sigreturn)
-])
+assembly = "\n".join(
+    [shellcraft.read(constants.STDIN_FILENO, "sp", 1024), shellcraft.syscall(constants.SYS_rt_sigreturn)]
+)
 
 binary = ELF.from_assembly(assembly)
 

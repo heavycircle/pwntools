@@ -9,26 +9,30 @@ Solution:
  1. Always run wireshark or tcpdump.  Always.
  2. Register <your socket>.clean or <your socket>.clean_and_log to run at exit.
 """
+from __future__ import annotations
+
+from multiprocessing import Process
 
 from pwn import *
-from multiprocessing import Process
+
 
 def submit_data():
     with context.quiet:
         with listen(1337) as io:
             io.wait_for_connection()
-            io.sendline(b'prefix sometext')
-            io.sendline(b'prefix someothertext')
-            io.sendline(b'here comes the flag')
-            io.sendline(b'LostInTheInterTubes')
+            io.sendline(b"prefix sometext")
+            io.sendline(b"prefix someothertext")
+            io.sendline(b"here comes the flag")
+            io.sendline(b"LostInTheInterTubes")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     p = Process(target=submit_data)
     p.start()
 
-    r = remote('localhost', 1337)
+    r = remote("localhost", 1337)
     atexit.register(r.clean_and_log)
 
     while True:
         line = r.recvline()
-        print(re.findall(br'^prefix (\S+)$', line)[0])
+        print(re.findall(rb"^prefix (\S+)$", line)[0])

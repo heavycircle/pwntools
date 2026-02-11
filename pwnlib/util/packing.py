@@ -1,4 +1,3 @@
- # -*- coding: utf-8 -*-
 r"""
 Module for packing and unpacking integers.
 
@@ -30,24 +29,22 @@ Examples:
     >>> with context.local(endian='big'): print(repr(p(0x1ff)))
     b'\xff\x01'
 """
-from __future__ import absolute_import
-from __future__ import division
 
-import collections
+from __future__ import annotations
+
 import struct
 import sys
 import warnings
 
-from pwnlib.context import LocalNoarchContext
-from pwnlib.context import context
+from pwnlib.context import LocalNoarchContext, context
 from pwnlib.log import getLogger
-
 from pwnlib.util import iters
 
 mod = sys.modules[__name__]
 log = getLogger(__name__)
 
-def pack(number, word_size = None, endianness = None, sign = None, **kwargs):
+
+def pack(number, word_size=None, endianness=None, sign=None, **kwargs):
     r"""pack(number, word_size = None, endianness = None, sign = None, **kwargs) -> str
 
     Packs arbitrary-sized integer.
@@ -96,21 +93,21 @@ def pack(number, word_size = None, endianness = None, sign = None, **kwargs):
         b'\xff\xff\xff\xff'
         >>> pack(0x80000000, 'all', 'big', True)
         b'\x00\x80\x00\x00\x00'
-"""
+    """
     if sign is None and number < 0:
         sign = True
 
-    if word_size != 'all':
-        kwargs.setdefault('word_size', word_size)
+    if word_size != "all":
+        kwargs.setdefault("word_size", word_size)
 
-    kwargs.setdefault('endianness', endianness)
-    kwargs.setdefault('sign', sign)
+    kwargs.setdefault("endianness", endianness)
+    kwargs.setdefault("sign", sign)
 
     with context.local(**kwargs):
         # Lookup in context if not found
-        word_size  = 'all' if word_size == 'all' else context.word_size
+        word_size = "all" if word_size == "all" else context.word_size
         endianness = context.endianness
-        sign       = context.sign
+        sign = context.sign
 
         if not isinstance(number, int):
             raise ValueError("pack(): number must be of type int (got %r)" % type(number))
@@ -118,11 +115,11 @@ def pack(number, word_size = None, endianness = None, sign = None, **kwargs):
         if not isinstance(sign, bool):
             raise ValueError("pack(): sign must be either True or False (got %r)" % sign)
 
-        if endianness not in ['little', 'big']:
+        if endianness not in ["little", "big"]:
             raise ValueError("pack(): endianness must be either 'little' or 'big' (got %r)" % endianness)
 
         # Verify that word_size make sense
-        if word_size == 'all':
+        if word_size == "all":
             if number == 0:
                 word_size = 8
             elif number > 0:
@@ -138,7 +135,7 @@ def pack(number, word_size = None, endianness = None, sign = None, **kwargs):
             raise ValueError("pack(): word_size must be a positive integer or the string 'all'")
 
         if sign:
-            limit = 1 << (word_size-1)
+            limit = 1 << (word_size - 1)
             if not -limit <= number < limit:
                 raise ValueError("pack(): number does not fit within word_size")
         else:
@@ -154,16 +151,17 @@ def pack(number, word_size = None, endianness = None, sign = None, **kwargs):
         out = []
 
         for _ in range(byte_size):
-            out.append(_p8lu(number & 0xff))
+            out.append(_p8lu(number & 0xFF))
             number = number >> 8
 
-        if endianness == 'little':
-            return b''.join(out)
+        if endianness == "little":
+            return b"".join(out)
         else:
-            return b''.join(reversed(out))
+            return b"".join(reversed(out))
+
 
 @LocalNoarchContext
-def unpack(data, word_size = None):
+def unpack(data, word_size=None):
     r"""unpack(data, word_size = None, endianness = None, sign = None, **kwargs) -> int
 
     Unpacks arbitrary-sized integer.
@@ -203,13 +201,13 @@ def unpack(data, word_size = None):
     """
 
     # Lookup in context if not found
-    word_size  = word_size  or context.word_size
+    word_size = word_size or context.word_size
     endianness = context.endianness
-    sign       = context.sign
+    sign = context.sign
     data = _need_bytes(data, 2)
 
     # Verify that word_size make sense
-    if word_size == 'all':
+    if word_size == "all":
         word_size = len(data) * 8
     elif not isinstance(word_size, int) or word_size <= 0:
         raise ValueError("unpack(): word_size must be a positive integer or the string 'all'")
@@ -233,11 +231,12 @@ def unpack(data, word_size = None):
     if not sign:
         return int(number)
 
-    signbit = number & (1 << (word_size-1))
-    return int(number - 2*signbit)
+    signbit = number & (1 << (word_size - 1))
+    return int(number - 2 * signbit)
+
 
 @LocalNoarchContext
-def unpack_many(data, word_size = None):
+def unpack_many(data, word_size=None):
     """unpack_many(data, word_size = None, endianness = None, sign = None) -> int list
 
     Splits `data` into groups of ``word_size//8`` bytes and calls :func:`unpack` on each group.  Returns a list of the results.
@@ -268,11 +267,11 @@ def unpack_many(data, word_size = None):
         ['-0xfdfd']
     """
     # Lookup in context if None
-    word_size  = word_size  or context.word_size
+    word_size = word_size or context.word_size
     endianness = context.endianness
-    sign       = context.sign
+    sign = context.sign
 
-    if word_size == 'all':
+    if word_size == "all":
         return [unpack(data, word_size)]
 
     # Currently we only group on byte boundaries
@@ -282,47 +281,49 @@ def unpack_many(data, word_size = None):
     out = []
     n = word_size // 8
     for i in range(0, len(data), n):
-        out.append(unpack(data[i:i+n], word_size))
+        out.append(unpack(data[i : i + n], word_size))
 
     return list(map(int, out))
-
 
 
 #
 # Make individual packers, e.g. _p8lu
 #
-ops   = ['p','u']
-sizes = {8:'b', 16:'h', 32:'i', 64:'q'}
-ends  = ['b','l']
-signs = ['s','u']
+ops = ["p", "u"]
+sizes = {8: "b", 16: "h", 32: "i", 64: "q"}
+ends = ["b", "l"]
+signs = ["s", "u"]
 
-op_verbs         = {'p': 'pack', 'u': 'unpack'}
+op_verbs = {"p": "pack", "u": "unpack"}
 
 
-def make_single(op,size,end,sign):
-    name = '_%s%s%s%s' % (op, size, end, sign)
-    fmt  = sizes[size]
-    end = '>' if end == 'b' else '<'
+def make_single(op, size, end, sign):
+    name = "_%s%s%s%s" % (op, size, end, sign)
+    fmt = sizes[size]
+    end = ">" if end == "b" else "<"
 
-    if sign == 'u':
+    if sign == "u":
         fmt = fmt.upper()
-    fmt = end+fmt
+    fmt = end + fmt
 
     struct_op = getattr(struct.Struct(fmt), op_verbs[op])
-    if op == 'u':
+    if op == "u":
+
         def routine(data, stacklevel=1):
             data = _need_bytes(data, stacklevel)
             return struct_op(data)[0]
     else:
+
         def routine(data, stacklevel=None):
             return struct_op(data)
+
     routine.__name__ = routine.__qualname__ = name
 
     return name, routine
 
 
-for op,size,end,sign in iters.product(ops, sizes, ends, signs):
-    name, routine = make_single(op,size,end,sign)
+for op, size, end, sign in iters.product(ops, sizes, ends, signs):
+    name, routine = make_single(op, size, end, sign)
     setattr(mod, name, routine)
 
 
@@ -330,8 +331,7 @@ for op,size,end,sign in iters.product(ops, sizes, ends, signs):
 # Make normal user-oriented packers, e.g. p8
 #
 def _do_packing(op, size, number, endianness=None):
-
-    name = "%s%s" % (op,size)
+    name = "%s%s" % (op, size)
     mod = sys.modules[__name__]
 
     ls = getattr(mod, "_%sls" % (name))
@@ -341,13 +341,13 @@ def _do_packing(op, size, number, endianness=None):
 
     endian = endianness or context.endian
     signed = context.signed
-    return {("little", True ):  ls,
-            ("little", False):  lu,
-            ("big",    True ):  bs,
-            ("big",    False):  bu}[endian, signed](number, 3)
+    return {("little", True): ls, ("little", False): lu, ("big", True): bs, ("big", False): bu}[endian, signed](
+        number, 3
+    )
+
 
 @LocalNoarchContext
-def p8(number, endianness = None, **kwargs):
+def p8(number, endianness=None, **kwargs):
     """p8(number, endianness, sign, ...) -> bytes
 
     Packs an 8-bit integer
@@ -362,10 +362,11 @@ def p8(number, endianness = None, **kwargs):
     Returns:
         The packed number as a byte string
     """
-    return _do_packing('p', 8, number, endianness)
+    return _do_packing("p", 8, number, endianness)
+
 
 @LocalNoarchContext
-def p16(number, endianness = None, **kwargs):
+def p16(number, endianness=None, **kwargs):
     """p16(number, endianness, sign, ...) -> bytes
 
     Packs an 16-bit integer
@@ -387,10 +388,11 @@ def p16(number, endianness = None, **kwargs):
         >>> p16(0x4142, endianness='big')
         b'AB'
     """
-    return _do_packing('p', 16, number, endianness)
+    return _do_packing("p", 16, number, endianness)
+
 
 @LocalNoarchContext
-def p32(number, endianness = None, **kwargs):
+def p32(number, endianness=None, **kwargs):
     """p32(number, endianness, sign, ...) -> bytes
 
     Packs an 32-bit integer
@@ -412,10 +414,11 @@ def p32(number, endianness = None, **kwargs):
         >>> p32(0x41424344, endianness='big')
         b'ABCD'
     """
-    return _do_packing('p', 32, number, endianness)
+    return _do_packing("p", 32, number, endianness)
+
 
 @LocalNoarchContext
-def p64(number, endianness = None, **kwargs):
+def p64(number, endianness=None, **kwargs):
     """p64(number, endianness, sign, ...) -> bytes
 
     Packs an 64-bit integer
@@ -437,10 +440,11 @@ def p64(number, endianness = None, **kwargs):
         >>> p64(0x4142434445464748, endianness='big')
         b'ABCDEFGH'
     """
-    return _do_packing('p', 64, number, endianness)
+    return _do_packing("p", 64, number, endianness)
+
 
 @LocalNoarchContext
-def u8(data, endianness = None, **kwargs):
+def u8(data, endianness=None, **kwargs):
     """u8(data, endianness, sign, ...) -> int
 
     Unpacks an 8-bit integer
@@ -455,10 +459,11 @@ def u8(data, endianness = None, **kwargs):
     Returns:
         The unpacked number
     """
-    return _do_packing('u', 8, data, endianness)
+    return _do_packing("u", 8, data, endianness)
+
 
 @LocalNoarchContext
-def u16(data, endianness = None, **kwargs):
+def u16(data, endianness=None, **kwargs):
     """u16(data, endianness, sign, ...) -> int
 
     Unpacks an 16-bit integer
@@ -473,10 +478,11 @@ def u16(data, endianness = None, **kwargs):
     Returns:
         The unpacked number
     """
-    return _do_packing('u', 16, data, endianness)
+    return _do_packing("u", 16, data, endianness)
+
 
 @LocalNoarchContext
-def u32(data, endianness = None, **kwargs):
+def u32(data, endianness=None, **kwargs):
     """u32(data, endianness, sign, ...) -> int
 
     Unpacks an 32-bit integer
@@ -491,10 +497,11 @@ def u32(data, endianness = None, **kwargs):
     Returns:
         The unpacked number
     """
-    return _do_packing('u', 32, data, endianness)
+    return _do_packing("u", 32, data, endianness)
+
 
 @LocalNoarchContext
-def u64(data, endianness = None, **kwargs):
+def u64(data, endianness=None, **kwargs):
     """u64(data, endianness, sign, ...) -> int
 
     Unpacks an 64-bit integer
@@ -509,9 +516,10 @@ def u64(data, endianness = None, **kwargs):
     Returns:
         The unpacked number
     """
-    return _do_packing('u', 64, data, endianness)
+    return _do_packing("u", 64, data, endianness)
 
-def make_packer(word_size = None, sign = None, **kwargs):
+
+def make_packer(word_size=None, sign=None, **kwargs):
     """make_packer(word_size = None, endianness = None, sign = None) -> number → str
 
     Creates a packer by "freezing" the given arguments.
@@ -543,18 +551,18 @@ def make_packer(word_size = None, sign = None, **kwargs):
         error: integer out of range for 'I' format code
         >>> make_packer(33, endian='little', sign='unsigned')
         <function ...<lambda> at 0x...>
-"""
+    """
     with context.local(sign=sign, **kwargs):
-        word_size  = word_size or context.word_size
+        word_size = word_size or context.word_size
         endianness = context.endianness
-        sign       = sign if sign is None else context.sign
+        sign = sign if sign is None else context.sign
 
         if word_size in [8, 16, 32, 64]:
             packer = {
-                (8, 0, 0):  _p8lu,
-                (8, 0, 1):  _p8ls,
-                (8, 1, 0):  _p8bu,
-                (8, 1, 1):  _p8bs,
+                (8, 0, 0): _p8lu,
+                (8, 0, 1): _p8ls,
+                (8, 1, 0): _p8bu,
+                (8, 1, 1): _p8bs,
                 (16, 0, 0): _p16lu,
                 (16, 0, 1): _p16ls,
                 (16, 1, 0): _p16bu,
@@ -567,15 +575,16 @@ def make_packer(word_size = None, sign = None, **kwargs):
                 (64, 0, 1): _p64ls,
                 (64, 1, 0): _p64bu,
                 (64, 1, 1): _p64bs,
-            }.get((word_size, {'big': 1, 'little': 0}[endianness], sign))
+            }.get((word_size, {"big": 1, "little": 0}[endianness], sign))
 
             if packer:
                 return packer
 
         return lambda number: pack(number, word_size, endianness, sign)
 
+
 @LocalNoarchContext
-def make_unpacker(word_size = None, endianness = None, sign = None, **kwargs):
+def make_unpacker(word_size=None, endianness=None, sign=None, **kwargs):
     """make_unpacker(word_size = None, endianness = None, sign = None,  **kwargs) -> str → number
 
     Creates an unpacker by "freezing" the given arguments.
@@ -607,19 +616,19 @@ def make_unpacker(word_size = None, endianness = None, sign = None, **kwargs):
         error: unpack requires a string argument of length 4
         >>> make_unpacker(33, endian='little', sign='unsigned')
         <function ...<lambda> at 0x...>
-"""
-    word_size  = word_size or context.word_size
+    """
+    word_size = word_size or context.word_size
     endianness = context.endianness
-    sign       = context.sign
+    sign = context.sign
 
     if word_size in [8, 16, 32, 64]:
-        endianness = 1 if endianness == 'big'    else 0
+        endianness = 1 if endianness == "big" else 0
 
         return {
-            (8, 0, 0):  _u8lu,
-            (8, 0, 1):  _u8ls,
-            (8, 1, 0):  _u8bu,
-            (8, 1, 1):  _u8bs,
+            (8, 0, 0): _u8lu,
+            (8, 0, 1): _u8ls,
+            (8, 1, 0): _u8bu,
+            (8, 1, 1): _u8bs,
             (16, 0, 0): _u16lu,
             (16, 0, 1): _u16ls,
             (16, 1, 0): _u16bu,
@@ -636,11 +645,12 @@ def make_unpacker(word_size = None, endianness = None, sign = None, **kwargs):
     else:
         return lambda number: unpack(number, word_size, endianness, sign)
 
-def _fit(pieces, preprocessor, packer, filler, stacklevel=1):
 
+def _fit(pieces, preprocessor, packer, filler, stacklevel=1):
     # Pulls bytes from `filler` and adds them to `pad` until it ends in `key`.
     # Returns the index of `key` in `pad`.
     pad = bytearray()
+
     def fill(key):
         key = bytearray(key)
         offset = pad.find(key)
@@ -653,7 +663,7 @@ def _fit(pieces, preprocessor, packer, filler, stacklevel=1):
     # - convert str/unicode keys to offsets
     # - convert large int (no null-bytes in a machine word) keys to offsets
     pieces_ = dict()
-    large_key = 2**(context.word_size-8)
+    large_key = 2 ** (context.word_size - 8)
     for k, v in pieces.items():
         if isinstance(k, int):
             if k >= large_key:
@@ -672,10 +682,10 @@ def _fit(pieces, preprocessor, packer, filler, stacklevel=1):
     filler = iters.chain(pad, filler)
 
     # Build output
-    out = b''
+    out = b""
 
     # Negative indices need to be removed and then re-submitted
-    negative = {k:v for k,v in pieces.items() if isinstance(k, int) and k<0}
+    negative = {k: v for k, v in pieces.items() if isinstance(k, int) and k < 0}
 
     for k in negative:
         del pieces[k]
@@ -683,7 +693,9 @@ def _fit(pieces, preprocessor, packer, filler, stacklevel=1):
     # Positive output
     for k, v in sorted(pieces.items()):
         if k < len(out):
-            raise ValueError("flat(): data at offset %d overlaps with previous data which ends at offset %d" % (k, len(out)))
+            raise ValueError(
+                "flat(): data at offset %d overlaps with previous data which ends at offset %d" % (k, len(out))
+            )
 
         # Fill up to offset
         while len(out) < k:
@@ -693,14 +705,16 @@ def _fit(pieces, preprocessor, packer, filler, stacklevel=1):
         out += _flat([v], preprocessor, packer, filler, stacklevel + 1)
 
     # Now do negative indices
-    out_negative = b''
+    out_negative = b""
     if negative:
         most_negative = min(negative.keys())
         for k, v in sorted(negative.items()):
             k += -most_negative
 
             if k < len(out_negative):
-                raise ValueError("flat(): data at offset %d overlaps with previous data which ends at offset %d" % (k, len(out)))
+                raise ValueError(
+                    "flat(): data at offset %d overlaps with previous data which ends at offset %d" % (k, len(out))
+                )
 
             # Fill up to offset
             while len(out_negative) < k:
@@ -711,16 +725,16 @@ def _fit(pieces, preprocessor, packer, filler, stacklevel=1):
 
     return filler, out_negative + out
 
+
 def _flat(args, preprocessor, packer, filler, stacklevel=1):
     out = []
     for arg in args:
-
         if not isinstance(arg, (list, tuple, dict)):
             arg_ = preprocessor(arg)
             if arg_ is not None:
                 arg = arg_
 
-        if hasattr(arg, '__flat__'):
+        if hasattr(arg, "__flat__"):
             val = arg.__flat__()
         elif isinstance(arg, (list, tuple)):
             val = _flat(arg, preprocessor, packer, filler, stacklevel + 1)
@@ -744,7 +758,8 @@ def _flat(args, preprocessor, packer, filler, stacklevel=1):
             for _ in range(len(val)):
                 next(filler)
 
-    return b''.join(out)
+    return b"".join(out)
+
 
 @LocalNoarchContext
 def flat(*args, **kwargs):
@@ -898,10 +913,10 @@ def flat(*args, **kwargs):
     # HACK: To avoid circular imports we need to delay the import of `cyclic`
     from pwnlib.util import cyclic
 
-    preprocessor = kwargs.pop('preprocessor', lambda x: None)
-    filler       = kwargs.pop('filler', cyclic.de_bruijn())
-    length       = kwargs.pop('length', None)
-    stacklevel   = kwargs.pop('stacklevel', 0)
+    preprocessor = kwargs.pop("preprocessor", lambda x: None)
+    filler = kwargs.pop("filler", cyclic.de_bruijn())
+    length = kwargs.pop("length", None)
+    stacklevel = kwargs.pop("stacklevel", 0)
 
     if isinstance(filler, str):
         filler = bytearray(_need_bytes(filler))
@@ -915,14 +930,16 @@ def flat(*args, **kwargs):
     if length:
         if len(out) > length:
             raise ValueError("flat(): Arguments does not fit within `length` (= %d) bytes" % length)
-        out += b''.join(p8(next(filler)) for _ in range(length - len(out)))
+        out += b"".join(p8(next(filler)) for _ in range(length - len(out)))
 
     return out
 
+
 def fit(*args, **kwargs):
     """Legacy alias for :func:`flat`"""
-    kwargs['stacklevel'] = kwargs.get('stacklevel', 0) + 1
+    kwargs["stacklevel"] = kwargs.get("stacklevel", 0) + 1
     return flat(*args, **kwargs)
+
 
 """
     Generates a string from a dictionary mapping offsets to data to place at
@@ -961,13 +978,16 @@ def fit(*args, **kwargs):
 
     """
 
+
 def signed(integer):
     return unpack(pack(integer), signed=True)
+
 
 def unsigned(integer):
     return unpack(pack(integer))
 
-def dd(dst, src, count = 0, skip = 0, seek = 0, truncate = False):
+
+def dd(dst, src, count=0, skip=0, seek=0, truncate=False):
     """dd(dst, src, count = 0, skip = 0, seek = 0, truncate = False) -> dst
 
     Inspired by the command line tool ``dd``, this function copies `count` byte
@@ -1019,15 +1039,15 @@ def dd(dst, src, count = 0, skip = 0, seek = 0, truncate = False):
     """
 
     # Re-open file objects to make sure we have the mode right
-    if hasattr(src, 'name'):
-        src = open(src.name, 'rb')
-    if hasattr(dst, 'name'):
+    if hasattr(src, "name"):
+        src = open(src.name, "rb")
+    if hasattr(dst, "name"):
         real_dst = dst
-        dst = open(dst.name, 'rb+')
+        dst = open(dst.name, "rb+")
 
     # Special case: both `src` and `dst` are files, so we don't need to hold
     # everything in memory
-    if hasattr(src, 'seek') and hasattr(dst, 'seek'):
+    if hasattr(src, "seek") and hasattr(dst, "seek"):
         src.seek(seek)
         dst.seek(skip)
         n = 0
@@ -1057,15 +1077,15 @@ def dd(dst, src, count = 0, skip = 0, seek = 0, truncate = False):
         if count:
             # The only way to know where the `seek`th byte is, is to decode, but
             # we only need to decode up to the first `seek + count` code points
-            src = src[:seek + count].encode('utf8')
+            src = src[: seek + count].encode("utf8")
             # The code points may result in more that `seek + count` bytes
             src = src[seek : seek + count]
         else:
-            src = src.encode('utf8')[seek:]
+            src = src.encode("utf8")[seek:]
 
-    elif hasattr(src, 'seek'):
+    elif hasattr(src, "seek"):
         src.seek(seek)
-        src_ = b''
+        src_ = b""
         if count:
             while len(src_) < count:
                 s = src.read(count - len(src_))
@@ -1087,9 +1107,9 @@ def dd(dst, src, count = 0, skip = 0, seek = 0, truncate = False):
         else:
             src = src[seek:]
 
-    elif hasattr(src, '__iter__'):
+    elif hasattr(src, "__iter__"):
         src = src[seek:]
-        src_ = b''
+        src_ = b""
         for i, b in enumerate(src, seek):
             if count and i > count + seek:
                 break
@@ -1112,13 +1132,13 @@ def dd(dst, src, count = 0, skip = 0, seek = 0, truncate = False):
 
     # UTF-8 encode unicode `dst`
     if isinstance(dst, str):
-        dst = dst.encode('utf8')
+        dst = dst.encode("utf8")
         utf8 = True
     else:
         utf8 = False
 
     # Match on the type of `dst`
-    if   hasattr(dst, 'seek'):
+    if hasattr(dst, "seek"):
         dst.seek(skip)
         dst.write(src)
         if truncate:
@@ -1133,13 +1153,13 @@ def dd(dst, src, count = 0, skip = 0, seek = 0, truncate = False):
                 dst.pop()
 
     elif isinstance(dst, tuple):
-        tail = dst[skip + len(src):]
+        tail = dst[skip + len(src) :]
         dst = dst[:skip] + tuple(map(p8, bytearray(src)))
         if not truncate:
             dst = dst + tail
 
     elif isinstance(dst, bytes):
-        tail = dst[skip + len(src):]
+        tail = dst[skip + len(src) :]
         dst = dst[:skip] + src
         if not truncate:
             dst = dst + tail
@@ -1148,43 +1168,48 @@ def dd(dst, src, count = 0, skip = 0, seek = 0, truncate = False):
         raise TypeError("dd(): Unsupported `dst` type: %r" % type(dst))
 
     if utf8:
-        dst = dst.decode('utf8')
+        dst = dst.decode("utf8")
 
     return dst
 
+
 def _need_bytes(s, level=1, min_wrong=0):
     if isinstance(s, (bytes, bytearray)):
-        return s   # already bytes
+        return s  # already bytes
 
     encoding = context.encoding
-    errors = 'strict'
+    errors = "strict"
     worst = -1
-    if encoding == 'auto':
+    if encoding == "auto":
         worst = s and max(map(ord, s)) or 0
         if worst > 255:
-            encoding = 'UTF-8'
-            errors = 'surrogateescape'
+            encoding = "UTF-8"
+            errors = "surrogateescape"
         elif worst > 127:
-            encoding = 'ISO-8859-1'
+            encoding = "ISO-8859-1"
         else:
-            encoding = 'ASCII'
+            encoding = "ASCII"
 
     if worst >= min_wrong:
-        warnings.warn("Text is not bytes; assuming {}, no guarantees. See https://docs.pwntools.com/#bytes"
-                      .format(encoding), BytesWarning, level + 2)
+        warnings.warn(
+            f"Text is not bytes; assuming {encoding}, no guarantees. See https://docs.pwntools.com/#bytes",
+            BytesWarning,
+            level + 2,
+        )
     return s.encode(encoding, errors)
+
 
 def _need_text(s, level=1):
     if isinstance(s, str):
-        return s   # already text
+        return s  # already text
 
     if not isinstance(s, (bytes, bytearray)):
         return repr(s)
 
     encoding = context.encoding
-    errors = 'strict'
-    if encoding == 'auto':
-        for encoding in 'ASCII', 'UTF-8', 'ISO-8859-1':
+    errors = "strict"
+    if encoding == "auto":
+        for encoding in "ASCII", "UTF-8", "ISO-8859-1":
             try:
                 s.decode(encoding)
             except UnicodeDecodeError:
@@ -1192,33 +1217,39 @@ def _need_text(s, level=1):
             else:
                 break
 
-    warnings.warn("Bytes is not text; assuming {}, no guarantees. See https://docs.pwntools.com/#bytes"
-                  .format(encoding), BytesWarning, level + 2)
+    warnings.warn(
+        f"Bytes is not text; assuming {encoding}, no guarantees. See https://docs.pwntools.com/#bytes",
+        BytesWarning,
+        level + 2,
+    )
     return s.decode(encoding, errors)
+
 
 def _encode(s):
     if isinstance(s, (bytes, bytearray)):
-        return s   # already bytes
+        return s  # already bytes
 
-    if context.encoding == 'auto':
+    if context.encoding == "auto":
         try:
-            return s.encode('latin1')
+            return s.encode("latin1")
         except UnicodeEncodeError:
-            return s.encode('utf-8', 'surrogateescape')
+            return s.encode("utf-8", "surrogateescape")
     return s.encode(context.encoding)
+
 
 def _decode(b):
     if isinstance(b, str):
-        return b   # already text
+        return b  # already text
 
-    if context.encoding == 'auto':
+    if context.encoding == "auto":
         try:
-            return b.decode('utf-8')
+            return b.decode("utf-8")
         except UnicodeDecodeError:
-            return b.decode('latin1')
+            return b.decode("latin1")
         except AttributeError:
             return b
     return b.decode(context.encoding)
+
 
 del op, size, end, sign
 del name, routine, mod

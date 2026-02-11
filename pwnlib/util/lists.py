@@ -1,9 +1,9 @@
-from __future__ import division
+from __future__ import annotations
 
 import collections
 
 
-def partition(lst, f, save_keys = False):
+def partition(lst, f, save_keys=False):
     """partition(lst, f, save_keys = False) -> list
 
     Partitions an iterable into sublists using a function to specify which
@@ -36,7 +36,8 @@ def partition(lst, f, save_keys = False):
     else:
         return list(d.values())
 
-def group(n, lst, underfull_action = 'ignore', fill_value = None):
+
+def group(n, lst, underfull_action="ignore", fill_value=None):
     """group(n, lst, underfull_action = 'ignore', fill_value = None) -> list
 
     Split sequence into subsequences of given size. If the values cannot be
@@ -66,10 +67,10 @@ def group(n, lst, underfull_action = 'ignore', fill_value = None):
       [('1', '2'), ('3', '4')]
     """
 
-    if underfull_action not in ['ignore', 'drop', 'fill']:
+    if underfull_action not in ["ignore", "drop", "fill"]:
         raise ValueError("group(): underfull_action must be either 'ignore', 'drop' or 'fill'")
 
-    if underfull_action == 'fill':
+    if underfull_action == "fill":
         if isinstance(lst, tuple):
             fill_value = (fill_value,)
         elif isinstance(lst, list):
@@ -82,17 +83,18 @@ def group(n, lst, underfull_action = 'ignore', fill_value = None):
 
     out = []
     for i in range(0, len(lst), n):
-        out.append(lst[i:i+n])
+        out.append(lst[i : i + n])
 
     if out and len(out[-1]) < n:
-        if underfull_action == 'ignore':
+        if underfull_action == "ignore":
             pass
-        elif underfull_action == 'drop':
+        elif underfull_action == "drop":
             out.pop()
         else:
             out[-1] = out[-1] + fill_value * (n - len(out[-1]))
 
     return out
+
 
 def concat(l):
     """concat(l) -> list
@@ -111,6 +113,7 @@ def concat(l):
         res.extend(k)
 
     return res
+
 
 def concat_all(*args):
     """concat_all(*args) -> list
@@ -133,6 +136,7 @@ def concat_all(*args):
 
     return go(args, [])
 
+
 def ordlist(s):
     """ordlist(s) -> list
 
@@ -145,6 +149,7 @@ def ordlist(s):
     """
     return list(map(ord, s))
 
+
 def unordlist(cs):
     """unordlist(cs) -> str
 
@@ -155,7 +160,8 @@ def unordlist(cs):
       >>> unordlist([104, 101, 108, 108, 111])
       'hello'
     """
-    return ''.join(chr(c) for c in cs)
+    return "".join(chr(c) for c in cs)
+
 
 def findall(haystack, needle):
     """findall(l, e) -> l
@@ -177,6 +183,7 @@ def findall(haystack, needle):
       >>> list(findall("aaabaaabc", "aab"))
       [1, 5]
     """
+
     def __kmp_table(W):
         pos = 1
         cnd = 0
@@ -214,7 +221,6 @@ def findall(haystack, needle):
         for i, v in enumerate(S):
             if v == w:
                 yield i
-
 
     if type(haystack) != type(needle):
         needle = [needle]

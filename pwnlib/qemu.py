@@ -72,17 +72,17 @@ the appropriate path. ::
 
 Now QEMU should be able to run the libraries.
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import os
 
-from pwnlib.context import LocalContext
-from pwnlib.context import context
+from pwnlib.context import LocalContext, context
 from pwnlib.log import getLogger
 from pwnlib.util import misc
 
 log = getLogger(__name__)
+
 
 @LocalContext
 def archname():
@@ -96,17 +96,18 @@ def archname():
     'ppc'
     """
     return {
-        ('amd64', 'little'):     'x86_64',
-        ('arm', 'big'):          'armeb',
-        ('mips', 'little'):      'mipsel',
-        ('mips64', 'little'):    'mips64el',
-        ('powerpc', 'big'):      'ppc',
-        ('powerpc64', 'big'):    'ppc64',
-        ('powerpc64', 'little'): 'ppc64le',
-        ('thumb', 'little'):     'arm',
-        ('thumb', 'big'):        'armeb',
-        ('aarch64', 'big'):      'aarch64_be',
+        ("amd64", "little"): "x86_64",
+        ("arm", "big"): "armeb",
+        ("mips", "little"): "mipsel",
+        ("mips64", "little"): "mips64el",
+        ("powerpc", "big"): "ppc",
+        ("powerpc64", "big"): "ppc64",
+        ("powerpc64", "little"): "ppc64le",
+        ("thumb", "little"): "arm",
+        ("thumb", "big"): "armeb",
+        ("aarch64", "big"): "aarch64_be",
     }.get((context.arch, context.endian), context.arch)
+
 
 @LocalContext
 def user_path():
@@ -119,12 +120,12 @@ def user_path():
     >>> pwnlib.qemu.user_path(arch='thumb')
     'qemu-arm-static'
     """
-    arch   = archname()
-    system = 'qemu-system-' + arch
-    normal = 'qemu-' + arch
-    static = normal + '-static'
+    arch = archname()
+    system = "qemu-system-" + arch
+    normal = "qemu-" + arch
+    static = normal + "-static"
 
-    if context.os == 'baremetal':
+    if context.os == "baremetal":
         if misc.which(system):
             return system
     else:
@@ -136,6 +137,7 @@ def user_path():
 
     log.warn_once("Neither %r nor %r are available" % (normal, static))
 
+
 @LocalContext
 def ld_prefix(path=None, env=None):
     """Returns the linker prefix for the selected qemu-user binary
@@ -143,32 +145,31 @@ def ld_prefix(path=None, env=None):
     >>> pwnlib.qemu.ld_prefix(arch='arm')  # doctest: +SKIP
     '/etc/qemu-binfmt/arm'
     """
-    if context.os == 'baremetal':
+    if context.os == "baremetal":
         return ""
 
     if path is None:
         path = user_path()
 
     # Did we explicitly specify the path in an environment variable?
-    if env and b'QEMU_LD_PREFIX' in env:
-        return env[b'QEMU_LD_PREFIX'].decode()
+    if env and b"QEMU_LD_PREFIX" in env:
+        return env[b"QEMU_LD_PREFIX"].decode()
 
-    if 'QEMU_LD_PREFIX' in os.environ:
-        return os.environ['QEMU_LD_PREFIX']
+    if "QEMU_LD_PREFIX" in os.environ:
+        return os.environ["QEMU_LD_PREFIX"]
 
     # Cyclic imports!
     from pwnlib.tubes.process import process
 
     with context.quiet:
-        with process([path, '--help'], env=env) as io:
-            line = io.recvline_regex(b'QEMU_LD_PREFIX *=')
+        with process([path, "--help"], env=env) as io:
+            line = io.recvline_regex(b"QEMU_LD_PREFIX *=")
 
-    _, libpath = line.split(b'=', 1)
+    _, libpath = line.split(b"=", 1)
 
     libpath = libpath.strip()
 
     if not isinstance(libpath, str):
-        libpath = libpath.decode('utf-8')
+        libpath = libpath.decode("utf-8")
 
     return libpath
-

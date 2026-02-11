@@ -1,28 +1,21 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
+from __future__ import annotations
 
 import atexit
-import errno
 import os
-import re
 import shutil
 import signal
-import struct
 import sys
 import threading
 import traceback
 import weakref
 
-if sys.platform != 'win32':
-    import fcntl
+if sys.platform != "win32":
     import termios
 
 from ..context import ContextType
 from . import termcap
-from .. import py2compat
 
-__all__ = ['output', 'init']
+__all__ = ["output", "init"]
 
 # we assume no terminal can display more lines than this
 MAX_TERM_HEIGHT = 200
@@ -39,7 +32,8 @@ fd = sys.stdout
 winchretry = False
 rlock = threading.RLock()
 
-class WinchLock(object):
+
+class WinchLock:
     def __init__(self):
         self.guard = threading.RLock()
         self.lock = threading.Lock()
@@ -55,6 +49,7 @@ class WinchLock(object):
     def __enter__(self):
         self.guard.acquire()
         return self.lock.__enter__()
+
     def __exit__(self, tp, val, tb):
         try:
             return self.lock.__exit__(tp, val, tb)
@@ -63,17 +58,22 @@ class WinchLock(object):
                 handler_sigwinch(signal.SIGWINCH, None)
             self.guard.release()
 
+
 wlock = WinchLock()
 
+
 def show_cursor():
-    do('cnorm')
+    do("cnorm")
+
 
 def hide_cursor():
-    do('civis')
+    do("civis")
+
 
 def update_geometry():
     global width, height
     width, height = shutil.get_terminal_size()
+
 
 def handler_sigwinch(signum, stack):
     global cached_pos, winchretry
@@ -88,18 +88,21 @@ def handler_sigwinch(signum, stack):
             for cb in on_winch:
                 cb()
             wlock.release()
-            if not winchretry: break
+            if not winchretry:
+                break
 
 
 def handler_sigstop(signum, stack):
     resetterm()
     os.kill(0, signal.SIGSTOP)
 
+
 def handler_sigcont(signum, stack):
     global epoch, cached_pos, setup_done
     epoch += 1
     cached_pos = None
     setup_done = False
+
 
 def setupterm():
     global settings, setup_done
@@ -108,7 +111,7 @@ def setupterm():
     setup_done = True
     hide_cursor()
     update_geometry()
-    do('smkx') # keypad mode
+    do("smkx")  # keypad mode
     mode = termios.tcgetattr(fd)
     IFLAG, OFLAG, CFLAG, LFLAG, ISPEED, OSPEED, CC = range(7)
     if not settings:
@@ -120,6 +123,7 @@ def setupterm():
     termios.tcsetattr(fd, termios.TCSADRAIN, mode)
     fd.flush()
 
+
 def resetterm():
     global settings, setup_done
     if settings:
@@ -128,32 +132,38 @@ def resetterm():
     if setup_done:
         setup_done = False
         show_cursor()
-        do('rmkx')
+        do("rmkx")
         fd.flush()
+
 
 def init():
     atexit.register(resetterm)
     signal.signal(signal.SIGWINCH, handler_sigwinch)
     signal.signal(signal.SIGTSTP, handler_sigstop)
     signal.signal(signal.SIGCONT, handler_sigcont)
+
     class Wrapper:
         def __init__(self, fd):
             self._fd = fd
+
         def write(self, s):
             return output(s, frozen=True)
+
         def __getattr__(self, k):
             return getattr(self._fd, k)
+
     if sys.stdout.isatty():
         sys.stdout = Wrapper(sys.stdout)
     if sys.stderr.isatty():
         sys.stderr = Wrapper(sys.stderr)
 
-    console = ContextType.defaults['log_console']
+    console = ContextType.defaults["log_console"]
     if console.isatty():
-        ContextType.defaults['log_console'] = Wrapper(console)
+        ContextType.defaults["log_console"] = Wrapper(console)
 
     # freeze all cells if an exception is thrown
     orig_hook = sys.excepthook
+
     def hook(*args):
         sys.stderr = sys.__stderr__
         resetterm()
@@ -162,55 +172,59 @@ def init():
             orig_hook(*args)
         else:
             traceback.print_exception(*args)
+
     sys.excepthook = hook
 
-tmap = {c: '\\x{:02x}'.format(c) for c in set(range(0x20)) - {0x09, 0x0a, 0x0d, 0x1b} | {0x7f}}
+
+tmap = {c: f"\\x{c:02x}" for c in set(range(0x20)) - {0x09, 0x0A, 0x0D, 0x1B} | {0x7F}}
+
 
 def put(s):
     global cached_pos, epoch
     s = s.translate(tmap)
     if cached_pos:
-        it = iter(s.replace('\n', '\r\n'))
-        sanit_s = ''
+        it = iter(s.replace("\n", "\r\n"))
+        sanit_s = ""
         for c in it:
-            if c == '\r':
+            if c == "\r":
                 cached_pos[1] = 0
-            elif c == '\n':
+            elif c == "\n":
                 cached_pos[0] += 1
-            elif c == '\t':
+            elif c == "\t":
                 cached_pos[1] = (cached_pos[1] + 8) & -8
-            elif c in '\x1b\u009b':  # ESC or CSI
+            elif c in "\x1b\u009b":  # ESC or CSI
                 seq = c
                 for c in it:
                     seq += c
-                    if c not in '[0123456789;':
+                    if c not in "[0123456789;":
                         break
                 else:
                     # unterminated ctrl seq, just print it visually
-                    c = seq.replace('\x1b', r'\x1b').replace('\u009b', r'\u009b')
+                    c = seq.replace("\x1b", r"\x1b").replace("\u009b", r"\u009b")
                     cached_pos[1] += len(c)
 
                 # if '\e[123;123;123;123m' then nothing
-                if c == 'm':
+                if c == "m":
                     c = seq
                 else:
                     # undefined ctrl seq, just print it visually
-                    c = seq.replace('\x1b', r'\x1b').replace('\u009b', r'\u009b')
+                    c = seq.replace("\x1b", r"\x1b").replace("\u009b", r"\u009b")
                     cached_pos[1] += len(c)
-            elif c < ' ':
-                assert False, 'impossible ctrl char'
+            elif c < " ":
+                assert False, "impossible ctrl char"
             else:
                 # normal character, nothing to see here
                 cached_pos[1] += 1
             sanit_s += c
-        else:
-            s = sanit_s.replace('\r\n', '\n')
+        s = sanit_s.replace("\r\n", "\n")
     return fd.write(s)
+
 
 def do(c, *args):
     s = termcap.get(c, *args)
     if s:
-        fd.write(s.decode('utf-8'))
+        fd.write(s.decode("utf-8"))
+
 
 def goto(rc):
     global cached_pos
@@ -220,22 +234,22 @@ def goto(rc):
     # common cases: we can just go up/down a couple rows
     if c == 0:
         if r == nowr + 1:
-            fd.write('\n')
+            fd.write("\n")
             return
         if c != nowc:
-            fd.write('\r')
+            fd.write("\r")
     elif c != nowc:
-        do('hpa', c)
+        do("hpa", c)
 
     if r == nowr - 1:
-        do('cuu1')
+        do("cuu1")
     elif r < nowr:
-        do('cuu', nowr - r)
+        do("cuu", nowr - r)
     elif r > nowr:
-        do('cud', r - nowr)
+        do("cud", r - nowr)
 
 
-class Cell(object):
+class Cell:
     def __init__(self, value, float):
         self.value = value
         self.float = float
@@ -248,13 +262,13 @@ class Cell(object):
 
     def update(self, value):
         if isinstance(value, bytes):
-            value = value.decode('utf-8', 'backslashreplace')
+            value = value.decode("utf-8", "backslashreplace")
         with wlock:
             want_erase_line = False
-            if '\n' in value:
+            if "\n" in value:
                 if len(value) < len(self.value):
                     want_erase_line = True
-                elif '\n' not in self.value:  # not really supported
+                elif "\n" not in self.value:  # not really supported
                     for cell in cells.iter_after(self):
                         if cell.value:
                             want_erase_line = True
@@ -282,7 +296,7 @@ class Cell(object):
             return
         erased_line = None
         if erase_line:
-            do('el')
+            do("el")
             erased_line = self.pos[0]
         put(self.value)
         pos = get_position()
@@ -290,7 +304,7 @@ class Cell(object):
             goto(prev_pos)
             return
         if pos < self.pos_after:
-            do('el')
+            do("el")
             erased_line = self.pos[0]
         old_after = self.pos_after
         self.pos_after = pos
@@ -304,7 +318,7 @@ class Cell(object):
             if erased_line != pos[0]:
                 if pos[0] < cell.pos[0]:
                     # the cell moved up, erase its line
-                    do('el')
+                    do("el")
                     erased_line = pos[0]
                 elif cell.pos == pos:
                     # cell got neither moved nor erased
@@ -313,7 +327,7 @@ class Cell(object):
             if pos[1] < cell.pos[1]:
                 # the cell moved left, it must be same line as self; erase if not yet erased
                 if not erase_line and erased_line != pos[0]:
-                    do('el')
+                    do("el")
                     erased_line = pos[0]
 
             old_after = cell.pos_after
@@ -323,15 +337,15 @@ class Cell(object):
         else:
             if cell.float:
                 # erase all screen after last float
-                do('ed')
+                do("ed")
         if prev_pos > get_position():
             goto(prev_pos)
 
     def __repr__(self):
-        return '{}({!r}, float={}, pos={})'.format(self.__class__.__name__, self.value, self.float, self.pos)
+        return f"{self.__class__.__name__}({self.value!r}, float={self.float}, pos={self.pos})"
 
 
-class WeakCellList(object):
+class WeakCellList:
     def __init__(self):
         self._cells = []
         self._floats = []
@@ -376,7 +390,7 @@ class WeakCellList(object):
             if e == before:
                 L.insert(i, weakref.ref(v))
                 return
-        raise IndexError('output before dead cell')
+        raise IndexError("output before dead cell")
 
     def append(self, v):
         L = self._lists[v.float]
@@ -393,17 +407,17 @@ def get_position():
     return tuple(cached_pos)
 
 
-def output(s='', float=False, priority=10, frozen=False, indent=0, before=None):
+def output(s="", float=False, priority=10, frozen=False, indent=0, before=None):
     with wlock:
         if before:
             float = before.float
 
         if isinstance(s, bytes):
-            s = s.decode('utf-8', 'backslashreplace')
+            s = s.decode("utf-8", "backslashreplace")
         if frozen:
             for f in cells.floats:
                 f.prepare_redraw()
-                do('ed')  # we could do it only when necessary
+                do("ed")  # we could do it only when necessary
                 break
             ret = put(s)
             for f in cells.floats:

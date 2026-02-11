@@ -1,5 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 from pwnlib.encoders.i386.delta import i386DeltaEncoder
 
@@ -20,7 +19,8 @@ class amd64DeltaEncoder(i386DeltaEncoder):
     >>> p.recvline()
     b'hello\n'
     """
-    assembly = '''
+
+    assembly = """
 base:
     lea         rsi, base[rip]
     /* add rsi, (data-base) */
@@ -38,10 +38,11 @@ next:
     jnz         next
 
 data:
-'''
-    arch      = 'amd64'
-    raw       = b'H\x8d5\xf9\xff\xff\xffH\x83\xc6\x1a\xfcH\x89\xf7\xac\x93\xac(\xd8\xaa\x80\xeb\xacu\xf5'
+"""
+    arch = "amd64"
+    raw = b"H\x8d5\xf9\xff\xff\xffH\x83\xc6\x1a\xfcH\x89\xf7\xac\x93\xac(\xd8\xaa\x80\xeb\xacu\xf5"
     blacklist = set(raw)
 
+
 encode = amd64DeltaEncoder()
-__all__ = ['encode']
+__all__ = ["encode"]

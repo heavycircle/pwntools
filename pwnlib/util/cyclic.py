@@ -1,16 +1,16 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import string
 
-from pwnlib.context import context, LocalNoarchContext
+from pwnlib.context import LocalNoarchContext, context
 from pwnlib.log import getLogger
-from pwnlib.util import packing, iters
+from pwnlib.util import iters, packing
 
 log = getLogger(__name__)
 
+
 # Taken from https://en.wikipedia.org/wiki/De_Bruijn_sequence but changed to a generator
-def de_bruijn(alphabet = None, n = None):
+def de_bruijn(alphabet=None, n=None):
     """de_bruijn(alphabet = None, n = None) -> generator
 
     Generator for a sequence of unique substrings of length `n`. This is implemented using a
@@ -30,6 +30,7 @@ def de_bruijn(alphabet = None, n = None):
         alphabet = bytearray(alphabet)
     k = len(alphabet)
     a = [0] * k * n
+
     def db(t, p):
         if t > n:
             if n % p == 0:
@@ -45,9 +46,10 @@ def de_bruijn(alphabet = None, n = None):
                 for c in db(t + 1, t):
                     yield c
 
-    return db(1,1)
+    return db(1, 1)
 
-def cyclic(length = None, alphabet = None, n = None):
+
+def cyclic(length=None, alphabet=None, n=None):
     """cyclic(length = None, alphabet = None, n = None) -> list/str
 
     A simple wrapper over :func:`de_bruijn`. This function returns at most
@@ -125,16 +127,16 @@ def cyclic(length = None, alphabet = None, n = None):
         alphabet = context.cyclic_alphabet
 
     if length is not None and len(alphabet) ** n < length:
-        log.error("Can't create a pattern length=%i with len(alphabet)==%i and n==%i",
-                  length, len(alphabet), n)
+        log.error("Can't create a pattern length=%i with len(alphabet)==%i and n==%i", length, len(alphabet), n)
 
     generator = de_bruijn(alphabet, n)
     out = iters.take(length, generator)
 
     return _join_sequence(out, alphabet)
 
+
 @LocalNoarchContext
-def cyclic_find(subseq, alphabet = None, n = None):
+def cyclic_find(subseq, alphabet=None, n=None):
     """cyclic_find(subseq, alphabet = None, n = None) -> int
 
     Calculates the position of a substring into a De Bruijn sequence.
@@ -217,32 +219,41 @@ def cyclic_find(subseq, alphabet = None, n = None):
         n = context.cyclic_size
 
     if isinstance(subseq, int):
-        if subseq >= 2**(8*n):
+        if subseq >= 2 ** (8 * n):
             # Assumption: The user has given an integer that is more than 2**(8n) bits, but would otherwise fit within
             #  a register of size 2**(8m) where m is a multiple of four
-            notice = ("cyclic_find() expected an integer argument <= {cap:#x}, you gave {gave:#x}\n"
-                      "Unless you specified cyclic(..., n={fits}), you probably just want the first {n} bytes.\n"
-                      "Truncating the data at {n} bytes.  Specify cyclic_find(..., n={fits}) to override this.").format(
-                cap=2**(8*n)-1,
+            notice = (
+                "cyclic_find() expected an integer argument <= {cap:#x}, you gave {gave:#x}\n"
+                "Unless you specified cyclic(..., n={fits}), you probably just want the first {n} bytes.\n"
+                "Truncating the data at {n} bytes.  Specify cyclic_find(..., n={fits}) to override this."
+            ).format(
+                cap=2 ** (8 * n) - 1,
                 gave=subseq,
                 # The number of bytes needed to represent subseq, rounded to the next 4
                 fits=int(round(float(subseq.bit_length()) / 32 + 0.5) * 32) // 8,
                 n=n,
             )
             log.warn_once(notice)
-            if context.endian == 'little':
-                subseq &= 2**(8*n) - 1
+            if context.endian == "little":
+                subseq &= 2 ** (8 * n) - 1
             else:
-                while subseq >= 2**(8*n):
-                    subseq >>= 8*n
+                while subseq >= 2 ** (8 * n):
+                    subseq >>= 8 * n
         subseq = packing.pack(subseq, bytes=n)
     subseq = packing._need_bytes(subseq, 2, 0x80)
 
     if len(subseq) != n:
-        log.warn_once("cyclic_find() expected a %i-byte subsequence, you gave %r\n"
+        log.warn_once(
+            "cyclic_find() expected a %i-byte subsequence, you gave %r\n"
             "Unless you specified cyclic(..., n=%i), you probably just want the first %d bytes.\n"
             "Truncating the data at %d bytes.  Specify cyclic_find(..., n=%i) to override this.",
-            n, subseq, len(subseq), n, n, len(subseq))
+            n,
+            subseq,
+            len(subseq),
+            n,
+            n,
+            len(subseq),
+        )
         subseq = subseq[:n]
 
     if alphabet is None:
@@ -256,7 +267,8 @@ def cyclic_find(subseq, alphabet = None, n = None):
 
     return _gen_find(subseq, de_bruijn(alphabet, n))
 
-def metasploit_pattern(sets = None):
+
+def metasploit_pattern(sets=None):
     """metasploit_pattern(sets = [ string.ascii_uppercase, string.ascii_lowercase, string.digits ]) -> generator
 
     Generator for a sequence of characters as per Metasploit Framework's
@@ -268,8 +280,8 @@ def metasploit_pattern(sets = None):
     Arguments:
         sets: List of strings to generate the sequence over.
     """
-    sets = sets or [ string.ascii_uppercase, string.ascii_lowercase, string.digits ]
-    offsets = [ 0 ] * len(sets)
+    sets = sets or [string.ascii_uppercase, string.ascii_lowercase, string.digits]
+    offsets = [0] * len(sets)
     offsets_indexes_reversed = list(reversed(range(len(offsets))))
 
     while True:
@@ -283,10 +295,11 @@ def metasploit_pattern(sets = None):
             if offsets[i] != 0:
                 break
         # finish up if we've exhausted the sequence
-        if offsets == [ 0 ] * len(sets):
+        if offsets == [0] * len(sets):
             return
 
-def cyclic_metasploit(length = None, sets = None):
+
+def cyclic_metasploit(length=None, sets=None):
     """cyclic_metasploit(length = None, sets = [ string.ascii_uppercase, string.ascii_lowercase, string.digits ]) -> str
 
     A simple wrapper over :func:`metasploit_pattern`. This function returns a
@@ -307,18 +320,23 @@ def cyclic_metasploit(length = None, sets = None):
         >>> len(cyclic_metasploit())
         20280
     """
-    sets = sets or [ string.ascii_uppercase.encode(), string.ascii_lowercase.encode(), string.digits.encode() ]
+    sets = sets or [string.ascii_uppercase.encode(), string.ascii_lowercase.encode(), string.digits.encode()]
 
     generator = metasploit_pattern(sets)
     out = iters.take(length, generator)
 
     if length is not None and len(out) < length:
-        log.error("Can't create a pattern of length %i with sets of lengths %s. Maximum pattern length is %i.",
-                  length, list(map(len, sets)), len(out))
+        log.error(
+            "Can't create a pattern of length %i with sets of lengths %s. Maximum pattern length is %i.",
+            length,
+            list(map(len, sets)),
+            len(out),
+        )
 
     return _join_sequence(out, sets[0])
 
-def cyclic_metasploit_find(subseq, sets = None):
+
+def cyclic_metasploit_find(subseq, sets=None):
     """cyclic_metasploit_find(subseq, sets = [ string.ascii_uppercase, string.ascii_lowercase, string.digits ]) -> int
 
     Calculates the position of a substring into a Metasploit Pattern sequence.
@@ -336,12 +354,13 @@ def cyclic_metasploit_find(subseq, sets = None):
         >>> cyclic_metasploit_find(0x61413161)
         4
     """
-    sets = sets or [ string.ascii_uppercase.encode(), string.ascii_lowercase.encode(), string.digits.encode() ]
+    sets = sets or [string.ascii_uppercase.encode(), string.ascii_lowercase.encode(), string.digits.encode()]
 
     if isinstance(subseq, int):
-        subseq = packing.pack(subseq, 'all', 'little', False)
+        subseq = packing.pack(subseq, "all", "little", False)
 
     return _gen_find(subseq, metasploit_pattern(sets))
+
 
 def _gen_find(subseq, generator):
     """Returns the first position of `subseq` in the generator or -1 if there is no such position."""
@@ -360,15 +379,17 @@ def _gen_find(subseq, generator):
             return pos
     return -1
 
+
 def _join_sequence(seq, alphabet):
     if isinstance(alphabet, str):
-        return ''.join(seq)
+        return "".join(seq)
     elif isinstance(alphabet, bytes):
         return bytes(seq)
     else:
         return seq
 
-class cyclic_gen(object):
+
+class cyclic_gen:
     """
     Creates a stateful cyclic generator which can generate sequential chunks of de Bruijn sequences.
 
@@ -409,7 +430,7 @@ class cyclic_gen(object):
     (16, 1, 4)
     """
 
-    def __init__(self, alphabet = None, n = None):
+    def __init__(self, alphabet=None, n=None):
         if n is None:
             n = context.cyclic_size
 
@@ -422,7 +443,7 @@ class cyclic_gen(object):
         self._n = n
         self._chunks = []
 
-    def get(self, length = None):
+    def get(self, length=None):
         """
         Get the next de Bruijn sequence from this generator.
 
@@ -447,8 +468,12 @@ class cyclic_gen(object):
             self._chunks.append(length)
             self._total_length += length
             if len(self._alphabet) ** self._n < self._total_length:
-                log.error("Can't create a pattern length=%i with len(alphabet)==%i and n==%i",
-                          self._total_length, len(self._alphabet), self._n)
+                log.error(
+                    "Can't create a pattern length=%i with len(alphabet)==%i and n==%i",
+                    self._total_length,
+                    len(self._alphabet),
+                    self._n,
+                )
             out = [next(self._generator) for _ in range(length)]
         else:
             self._chunks.append(float("inf"))

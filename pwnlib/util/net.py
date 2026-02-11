@@ -1,80 +1,91 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import ctypes
 import ctypes.util
 import socket
 
-from pwnlib.util.packing import p16
-from pwnlib.util.packing import p32
-from pwnlib.util.packing import pack
+from pwnlib.util.packing import p16, p32, pack
 
-__all__ = ['getifaddrs', 'interfaces', 'interfaces4', 'interfaces6', 'sockaddr']
+__all__ = ["getifaddrs", "interfaces", "interfaces4", "interfaces6", "sockaddr"]
 
 # /usr/src/linux-headers-3.12-1-common/include/uapi/linux/socket.h
 sa_family_t = ctypes.c_ushort
 
+
 # /usr/src/linux-headers-3.12-1-common/include/linux/socket.h
 class struct_sockaddr(ctypes.Structure):
     _fields_ = [
-        ('sa_family', sa_family_t)       ,
-        ('sa_data'  , ctypes.c_char * 14),
-        ]
+        ("sa_family", sa_family_t),
+        ("sa_data", ctypes.c_char * 14),
+    ]
+
 
 # /usr/src/linux-headers-3.12-1-common/include/uapi/linux/in.h
 struct_in_addr = ctypes.c_uint8 * 4
+
+
 class struct_sockaddr_in(ctypes.Structure):
     _fields_ = [
-        ('sin_family', sa_family_t)    ,
-        ('sin_port'  , ctypes.c_uint16),
-        ('sin_addr'  , struct_in_addr) ,
-        ]
+        ("sin_family", sa_family_t),
+        ("sin_port", ctypes.c_uint16),
+        ("sin_addr", struct_in_addr),
+    ]
+
 
 # /usr/src/linux-headers-3.12-1-common/include/uapi/linux/in6.h
 struct_in6_addr = ctypes.c_uint8 * 16
+
+
 class struct_sockaddr_in6(ctypes.Structure):
     _fields_ = [
-        ('sin6_family'  , ctypes.c_ushort),
-        ('sin6_port'    , ctypes.c_uint16),
-        ('sin6_flowinfo', ctypes.c_uint32),
-        ('sin6_addr'    , struct_in6_addr),
-        ('sin6_scope_id', ctypes.c_uint32),
-        ]
+        ("sin6_family", ctypes.c_ushort),
+        ("sin6_port", ctypes.c_uint16),
+        ("sin6_flowinfo", ctypes.c_uint32),
+        ("sin6_addr", struct_in6_addr),
+        ("sin6_scope_id", ctypes.c_uint32),
+    ]
+
 
 # /usr/include/ifaddrs.h
 class union_ifa_ifu(ctypes.Union):
     _fields_ = [
-        ('ifu_broadaddr', ctypes.POINTER(struct_sockaddr)),
-        ('ifu_dstaddr'  , ctypes.POINTER(struct_sockaddr)),
-        ]
-class struct_ifaddrs(ctypes.Structure):
-    pass # recursively defined
-struct_ifaddrs._fields_ = [
-    ('ifa_next'   , ctypes.POINTER(struct_ifaddrs)) ,
-    ('ifa_name'   , ctypes.c_char_p)                ,
-    ('ifa_flags'  , ctypes.c_uint)                  ,
-    ('ifa_addr'   , ctypes.POINTER(struct_sockaddr)),
-    ('ifa_netmask', ctypes.POINTER(struct_sockaddr)),
-    ('ifa_ifu'    , union_ifa_ifu)                  ,
-    ('ifa_data'   , ctypes.c_void_p)                ,
+        ("ifu_broadaddr", ctypes.POINTER(struct_sockaddr)),
+        ("ifu_dstaddr", ctypes.POINTER(struct_sockaddr)),
     ]
 
-AddressFamily = getattr(socket, 'AddressFamily', int)
+
+class struct_ifaddrs(ctypes.Structure):
+    pass  # recursively defined
+
+
+struct_ifaddrs._fields_ = [
+    ("ifa_next", ctypes.POINTER(struct_ifaddrs)),
+    ("ifa_name", ctypes.c_char_p),
+    ("ifa_flags", ctypes.c_uint),
+    ("ifa_addr", ctypes.POINTER(struct_sockaddr)),
+    ("ifa_netmask", ctypes.POINTER(struct_sockaddr)),
+    ("ifa_ifu", union_ifa_ifu),
+    ("ifa_data", ctypes.c_void_p),
+]
+
+AddressFamily = getattr(socket, "AddressFamily", int)
+
 
 def sockaddr_fixup(saptr):
     family = AddressFamily(saptr.contents.sa_family)
     addr = {}
-    if   family == socket.AF_INET:
+    if family == socket.AF_INET:
         sa = ctypes.cast(saptr, ctypes.POINTER(struct_sockaddr_in)).contents
-        addr['port'] = socket.ntohs(sa.sin_port)
-        addr['addr'] = socket.inet_ntop(family, sa.sin_addr)
+        addr["port"] = socket.ntohs(sa.sin_port)
+        addr["addr"] = socket.inet_ntop(family, sa.sin_addr)
     elif family == socket.AF_INET6:
         sa = ctypes.cast(saptr, ctypes.POINTER(struct_sockaddr_in6)).contents
-        addr['port'] = socket.ntohs(sa.sin6_port)
-        addr['flowinfo'] = socket.ntohl(sa.sin6_flowinfo)
-        addr['addr'] = socket.inet_ntop(family, sa.sin6_addr)
-        addr['scope_id'] = sa.sin6_scope_id
+        addr["port"] = socket.ntohs(sa.sin6_port)
+        addr["flowinfo"] = socket.ntohl(sa.sin6_flowinfo)
+        addr["addr"] = socket.inet_ntop(family, sa.sin6_addr)
+        addr["scope_id"] = sa.sin6_scope_id
     return family, addr
+
 
 def getifaddrs():
     """getifaddrs() -> dict list
@@ -92,7 +103,7 @@ def getifaddrs():
       `family`.  If `family` is not :const:`socket.AF_INET` or
       :const:`socket.AF_INET6` they will be empty.
     """
-    libc = ctypes.CDLL(ctypes.util.find_library('c'))
+    libc = ctypes.CDLL(ctypes.util.find_library("c"))
     getifaddrs = libc.getifaddrs
     getifaddrs.restype = ctypes.c_int
     getifaddrs.argtpes = [ctypes.POINTER(ctypes.POINTER(struct_ifaddrs))]
@@ -108,24 +119,26 @@ def getifaddrs():
         ifas = []
         while ifaptr:
             ifac = ifaptr.contents
-            ifa = {'name' : ifac.ifa_name,
-                   'flags': ifac.ifa_flags,
-                   }
+            ifa = {
+                "name": ifac.ifa_name,
+                "flags": ifac.ifa_flags,
+            }
             if ifac.ifa_addr:
-                ifa['family'], ifa['addr'] = sockaddr_fixup(ifac.ifa_addr)
+                ifa["family"], ifa["addr"] = sockaddr_fixup(ifac.ifa_addr)
             else:
-                ifa['family'], ifa['addr'] = None, None
+                ifa["family"], ifa["addr"] = None, None
             if ifac.ifa_netmask:
-                _, ifa['netmask'] = sockaddr_fixup(ifac.ifa_netmask)
+                _, ifa["netmask"] = sockaddr_fixup(ifac.ifa_netmask)
             else:
-                ifa['network'] = None
+                ifa["network"] = None
             ifas.append(ifa)
             ifaptr = ifac.ifa_next
         return ifas
     finally:
         freeifaddrs(ifaptr)
 
-def interfaces(all = False):
+
+def interfaces(all=False):
     """interfaces(all = False) -> dict
 
     Arguments:
@@ -139,19 +152,20 @@ def interfaces(all = False):
     """
     out = {}
     for ifa in getifaddrs():
-        name = ifa['name']
+        name = ifa["name"]
         if name not in out:
             out[name] = []
-        if not ifa['addr']:
+        if not ifa["addr"]:
             continue
-        family = ifa['family']
-        addr = ifa['addr']['addr']
+        family = ifa["family"]
+        addr = ifa["addr"]["addr"]
         out[name].append((family, addr))
     if not all:
         out = {k: v for k, v in out.items() if v}
     return out
 
-def interfaces4(all = False):
+
+def interfaces4(all=False):
     """interfaces4(all = False) -> dict
 
     As :func:`interfaces` but only includes IPv4 addresses and the lists in the
@@ -171,13 +185,14 @@ def interfaces4(all = False):
         {...'127.0.0.1'...}
     """
     out = {}
-    for name, addrs in interfaces(all = all).items():
+    for name, addrs in interfaces(all=all).items():
         addrs = [addr for fam, addr in addrs if fam == socket.AF_INET]
         if addrs or all:
             out[name] = addrs
     return out
 
-def interfaces6(all = False):
+
+def interfaces6(all=False):
     """interfaces6(all = False) -> dict
 
     As :func:`interfaces` but only includes IPv6 addresses and the lists in the
@@ -197,13 +212,14 @@ def interfaces6(all = False):
         {...'::1'...}
     """
     out = {}
-    for name, addrs in interfaces(all = all).items():
+    for name, addrs in interfaces(all=all).items():
         addrs = [addr for fam, addr in addrs if fam == socket.AF_INET6]
         if addrs or all:
             out[name] = addrs
     return out
 
-def sockaddr(host, port, network = 'ipv4'):
+
+def sockaddr(host, port, network="ipv4"):
     """sockaddr(host, port, network = 'ipv4') -> (data, length, family)
 
     Creates a sockaddr_in or sockaddr_in6 memory buffer for use in shellcode.
@@ -216,7 +232,7 @@ def sockaddr(host, port, network = 'ipv4'):
     Returns:
       A tuple containing the sockaddr buffer, length, and the address family.
     """
-    address_family = {'ipv4':socket.AF_INET,'ipv6':socket.AF_INET6}[network]
+    address_family = {"ipv4": socket.AF_INET, "ipv6": socket.AF_INET6}[network]
 
     for family, _, _, _, ip in socket.getaddrinfo(host, None, address_family):
         ip = ip[0]
@@ -227,18 +243,19 @@ def sockaddr(host, port, network = 'ipv4'):
 
     info = socket.getaddrinfo(host, None, address_family)
     host = socket.inet_pton(address_family, ip)
-    sockaddr  = p16(address_family)
-    sockaddr += pack(port, word_size = 16, endianness = 'big') #Port should be big endian = network byte order
-    length    = 0
+    sockaddr = p16(address_family)
+    sockaddr += pack(port, word_size=16, endianness="big")  # Port should be big endian = network byte order
+    length = 0
 
-    if network == 'ipv4':
+    if network == "ipv4":
         sockaddr += host
-        length    = 16 # Save ten bytes by skipping two 'push 0'
+        length = 16  # Save ten bytes by skipping two 'push 0'
     else:
-        sockaddr += p32(0xffffffff) # Save three bytes 'push -1' vs 'push 0'
+        sockaddr += p32(0xFFFFFFFF)  # Save three bytes 'push -1' vs 'push 0'
         sockaddr += host
-        length    = len(sockaddr) + 4 # Save five bytes 'push 0'
+        length = len(sockaddr) + 4  # Save five bytes 'push 0'
     return (sockaddr, length, getattr(address_family, "name", address_family))
+
 
 def sock_match(local, remote, fam=socket.AF_UNSPEC, typ=0):
     """
@@ -246,6 +263,7 @@ def sock_match(local, remote, fam=socket.AF_UNSPEC, typ=0):
     psutil library against these two.  Useful for filtering done in
     :func:`pwnlib.util.proc.pidof`.
     """
+
     def sockinfos(addr, f, t):
         if not addr:
             return set()
@@ -256,7 +274,9 @@ def sock_match(local, remote, fam=socket.AF_UNSPEC, typ=0):
         # handle mixed IPv4-to-IPv6 and the other way round connections
         for f, t, proto, _canonname, sockaddr in tuple(infos):
             if f == socket.AF_INET and t != socket.SOCK_RAW:
-                infos |= set(socket.getaddrinfo(sockaddr[0], sockaddr[1], socket.AF_INET6, t, proto, socket.AI_V4MAPPED))
+                infos |= set(
+                    socket.getaddrinfo(sockaddr[0], sockaddr[1], socket.AF_INET6, t, proto, socket.AI_V4MAPPED)
+                )
         return infos
 
     local = sockinfos(local, fam, typ)

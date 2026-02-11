@@ -1,5 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import os
 import signal
@@ -16,17 +15,22 @@ from pwnlib.tubes.process import process
 
 log = getLogger(__name__)
 
+
 def testpwnproc(cmd):
     import fcntl
     import termios
+
     env = dict(os.environ)
     env.pop("PWNLIB_NOTERM", None)
     env["TERM"] = "xterm-256color"
+
     def handleusr1(sig, frame):
         s = p.stderr.read()
         log.error("child process failed:\n%s", s.decode())
+
     signal.signal(signal.SIGUSR1, handleusr1)
-    cmd = """\
+    cmd = (
+        """\
 import os
 import signal
 import sys
@@ -36,16 +40,19 @@ def ehook(*args):
     os.kill(os.getppid(), signal.SIGUSR1)
 sys.excepthook = ehook
 from pwn import *
-""" + cmd
+"""
+        + cmd
+    )
     if "coverage" in sys.modules:
         cmd = "import coverage; coverage.process_startup()\n" + cmd
         env.setdefault("COVERAGE_PROCESS_START", ".coveragerc")
-    env['COLUMNS'] = '80'
-    env['ROWS'] = '24'
+    env["COLUMNS"] = "80"
+    env["ROWS"] = "24"
     p = process([sys.executable, "-c", cmd], env=env, stderr=subprocess.PIPE)
     # late initialization can lead to EINTR in many places
-    fcntl.ioctl(p.stdout.fileno(), termios.TIOCSWINSZ, struct.pack('HH', 24, 80))
+    fcntl.ioctl(p.stdout.fileno(), termios.TIOCSWINSZ, struct.pack("HH", 24, 80))
     return p
+
 
 def yesno(prompt, default=None):
     r"""Presents the user with prompt (typically in the form of question)
@@ -88,46 +95,48 @@ def yesno(prompt, default=None):
     """
 
     if default is not None and not isinstance(default, bool):
-        raise ValueError('yesno(): default must be a boolean or None')
+        raise ValueError("yesno(): default must be a boolean or None")
 
     if term.term_mode:
-        term.output(' [?] %s [' % prompt)
-        yesfocus, yes = term.text.bold('Yes'), 'yes'
-        nofocus, no = term.text.bold('No'), 'no'
+        term.output(" [?] %s [" % prompt)
+        yesfocus, yes = term.text.bold("Yes"), "yes"
+        nofocus, no = term.text.bold("No"), "no"
         hy = term.output(yesfocus if default is True else yes)
-        hs = term.output('/')
+        hs = term.output("/")
         hn = term.output(nofocus if default is False else no)
-        he = term.output(']\n')
+        he = term.output("]\n")
         cur = default
         while True:
             k = term.key.get()
-            if   k in ('y', 'Y', '<left>') and cur is not True:
+            if k in ("y", "Y", "<left>") and cur is not True:
                 cur = True
                 hy.update(yesfocus)
                 hn.update(no)
-            elif k in ('n', 'N', '<right>') and cur is not False:
+            elif k in ("n", "N", "<right>") and cur is not False:
                 cur = False
                 hy.update(yes)
                 hn.update(nofocus)
-            elif k == '<enter>':
+            elif k == "<enter>":
                 if cur is not None:
                     return cur
     else:
-        prompt = ' [?] %s [%s/%s] ' % (prompt,
-                                       'Yes' if default is True else 'yes',
-                                       'No' if default is False else 'no',
-                                       )
+        prompt = " [?] %s [%s/%s] " % (
+            prompt,
+            "Yes" if default is True else "yes",
+            "No" if default is False else "no",
+        )
         while True:
             opt = raw_input(prompt).strip().lower()
             if not opt and default is not None:
                 return default
-            elif opt in (b'y', b'yes'):
+            elif opt in (b"y", b"yes"):
                 return True
-            elif opt in (b'n', b'no'):
+            elif opt in (b"n", b"no"):
                 return False
-            print('Please answer yes or no')
+            print("Please answer yes or no")
 
-def options(prompt, opts, default = None):
+
+def options(prompt, opts, default=None):
     r"""Presents the user with a prompt (typically in the
     form of a question) and a number of options.
 
@@ -180,41 +189,41 @@ def options(prompt, opts, default = None):
     """
 
     if default is not None and not isinstance(default, int):
-        raise ValueError('options(): default must be a number or None')
+        raise ValueError("options(): default must be a number or None")
 
     if term.term_mode:
-        numfmt = '%' + str(len(str(len(opts)))) + 'd) '
-        print(' [?] ' + prompt)
+        numfmt = "%" + str(len(str(len(opts)))) + "d) "
+        print(" [?] " + prompt)
         hs = []
-        space = '       '
-        arrow = term.text.bold_green('    => ')
+        space = "       "
+        arrow = term.text.bold_green("    => ")
         cur = default
         for i, opt in enumerate(opts):
-            h = term.output(arrow if i == cur else space, frozen = False)
+            h = term.output(arrow if i == cur else space, frozen=False)
             num = numfmt % (i + 1)
             h1 = term.output(num)
-            h2 = term.output(opt + '\n', indent = len(num) + len(space))
+            h2 = term.output(opt + "\n", indent=len(num) + len(space))
             hs.append((h, h1, h2))
-        ds = ''
+        ds = ""
         while True:
             prev = cur
             was_digit = False
             k = term.key.get()
-            if   k == '<up>':
+            if k == "<up>":
                 if cur is None:
                     cur = 0
                 else:
                     cur = max(0, cur - 1)
-            elif k == '<down>':
+            elif k == "<down>":
                 if cur is None:
                     cur = 0
                 else:
                     cur = min(len(opts) - 1, cur + 1)
-            elif k == 'C-<up>':
+            elif k == "C-<up>":
                 cur = 0
-            elif k == 'C-<down>':
+            elif k == "C-<down>":
                 cur = len(opts) - 1
-            elif k in ('<enter>', '<right>'):
+            elif k in ("<enter>", "<right>"):
                 if cur is not None:
                     return cur
             elif k in tuple(string.digits):
@@ -224,7 +233,7 @@ def options(prompt, opts, default = None):
                 if 0 < n <= len(opts):
                     ds += d
                     cur = n - 1
-                elif d != '0':
+                elif d != "0":
                     ds = d
                     n = int(ds)
                     cur = n - 1
@@ -233,26 +242,27 @@ def options(prompt, opts, default = None):
                 if prev is not None:
                     hs[prev][0].update(space)
                 if was_digit:
-                    hs[cur][0].update(term.text.bold_green('%5s> ' % ds))
+                    hs[cur][0].update(term.text.bold_green("%5s> " % ds))
                 else:
                     hs[cur][0].update(arrow)
     else:
-        linefmt =       '       %' + str(len(str(len(opts)))) + 'd) %s'
+        linefmt = "       %" + str(len(str(len(opts)))) + "d) %s"
         if default is not None:
             default += 1
         while True:
-            print(' [?] ' + prompt)
+            print(" [?] " + prompt)
             for i, opt in enumerate(opts):
                 print(linefmt % (i + 1, opt))
-            s = '     Choice '
+            s = "     Choice "
             if default:
-                s += '[%s] ' % str(default)
+                s += "[%s] " % str(default)
             try:
                 x = int(raw_input(s) or default)
             except (ValueError, TypeError):
                 continue
             if x >= 1 and x <= len(opts):
                 return x - 1
+
 
 def pause(n=None):
     r"""Waits for either user input or a specific number of seconds.
@@ -288,19 +298,20 @@ def pause(n=None):
 
     if n is None:
         if term.term_mode:
-            log.info('Paused (press any to continue)')
+            log.info("Paused (press any to continue)")
             term.getkey()
         else:
-            log.info('Paused (press enter to continue)')
-            raw_input('')
+            log.info("Paused (press enter to continue)")
+            raw_input("")
     elif isinstance(n, int):
         with log.waitfor("Waiting") as l:
             for i in range(n, 0, -1):
-                l.status('%d... ' % i)
+                l.status("%d... " % i)
                 time.sleep(1)
             l.success()
     else:
-        raise ValueError('pause(): n must be a number or None')
+        raise ValueError("pause(): n must be a number or None")
+
 
 def more(text):
     r"""more(text)
@@ -315,8 +326,8 @@ def more(text):
     Returns:
       :const:`None`
 
-    Tests:      
- 
+    Tests:
+
         >>> more("text")
         text
         >>> p = testpwnproc("more('text\\n' * (term.height + 2))")
@@ -326,11 +337,11 @@ def more(text):
         True
     """
     if term.term_mode:
-        lines = text.split('\n')
-        h = term.output(term.text.reverse('(more)'), float = True, frozen = False)
+        lines = text.split("\n")
+        h = term.output(term.text.reverse("(more)"), float=True, frozen=False)
         step = term.height - 1
         for i in range(0, len(lines), step):
-            for l in lines[i:i + step]:
+            for l in lines[i : i + step]:
                 print(l)
             if i + step < len(lines):
                 term.key.get()

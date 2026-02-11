@@ -1,20 +1,17 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import collections
 import random
 import re
-import string
 
-from pwnlib.context import LocalContext
-from pwnlib.context import context
+from pwnlib.context import LocalContext, context
 from pwnlib.log import getLogger
 from pwnlib.util.fiddling import hexdump
 
 log = getLogger(__name__)
 
-class Encoder(object):
+
+class Encoder:
     _encoders = collections.defaultdict(lambda: [])
 
     #: Architecture which this encoder works on
@@ -46,7 +43,7 @@ class Encoder(object):
 
 
 @LocalContext
-def encode(raw_bytes, avoid=None, expr=None, force=0, pcreg=''):
+def encode(raw_bytes, avoid=None, expr=None, force=0, pcreg=""):
     """encode(raw_bytes, avoid, expr, force) -> str
 
     Encode shellcode ``raw_bytes`` such that it does not contain
@@ -62,7 +59,7 @@ def encode(raw_bytes, avoid=None, expr=None, force=0, pcreg=''):
     """
     orig_avoid = avoid
 
-    avoid = set(avoid or '')
+    avoid = set(avoid or "")
 
     if expr:
         for char in all_chars:
@@ -90,10 +87,9 @@ def encode(raw_bytes, avoid=None, expr=None, force=0, pcreg=''):
 
         return v
 
-
-    avoid_errmsg = ''
+    avoid_errmsg = ""
     if orig_avoid and expr:
-        avoid_errmsg = '%r and %r' % (orig_avoid, expr)
+        avoid_errmsg = "%r and %r" % (orig_avoid, expr)
     elif expr:
         avoid_errmsg = repr(expr)
     else:
@@ -101,15 +97,17 @@ def encode(raw_bytes, avoid=None, expr=None, force=0, pcreg=''):
 
     args = (context.arch, avoid_errmsg, hexdump(raw_bytes))
     msg = "No encoders for %s which can avoid %s for\n%s" % args
-    msg = msg.replace('%', '%%')
+    msg = msg.replace("%", "%%")
     log.error(msg)
 
-all_chars        = list(chr(i) for i in range(256))
-re_alphanumeric  = r'[^A-Za-z0-9]'
-re_printable     = r'[^\x21-\x7e]'
-re_whitespace    = r'\s'
-re_null          = r'\x00'
-re_line          = r'[\s\x00]'
+
+all_chars = list(chr(i) for i in range(256))
+re_alphanumeric = r"[^A-Za-z0-9]"
+re_printable = r"[^\x21-\x7e]"
+re_whitespace = r"\s"
+re_null = r"\x00"
+re_line = r"[\s\x00]"
+
 
 @LocalContext
 def null(raw_bytes, *a, **kw):
@@ -122,6 +120,7 @@ def null(raw_bytes, *a, **kw):
     """
     return encode(raw_bytes, expr=re_null, *a, **kw)
 
+
 @LocalContext
 def line(raw_bytes, *a, **kw):
     """line(raw_bytes) -> str
@@ -132,6 +131,7 @@ def line(raw_bytes, *a, **kw):
     Accepts the same arguments as :func:`encode`.
     """
     return encode(raw_bytes, expr=re_whitespace, *a, **kw)
+
 
 @LocalContext
 def alphanumeric(raw_bytes, *a, **kw):
@@ -144,6 +144,7 @@ def alphanumeric(raw_bytes, *a, **kw):
     """
     return encode(raw_bytes, expr=re_alphanumeric, *a, **kw)
 
+
 @LocalContext
 def printable(raw_bytes, *a, **kw):
     """printable(raw_bytes) -> str
@@ -154,6 +155,7 @@ def printable(raw_bytes, *a, **kw):
     Accepts the same arguments as :func:`encode`.
     """
     return encode(raw_bytes, expr=re_printable, *a, **kw)
+
 
 @LocalContext
 def scramble(raw_bytes, *a, **kw):

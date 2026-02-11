@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Allows per-user and per-host configuration of Pwntools settings.
 
 The list of configurable options includes all of the logging symbols
@@ -32,13 +31,14 @@ supported by ``pwnlib.util.safeeval.expr``.
     [update]
     interval=7
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import configparser
 import os
 
 registered_configs = {}
+
 
 def register_config(section, function):
     """Registers a configuration section.
@@ -50,18 +50,17 @@ def register_config(section, function):
     """
     registered_configs[section] = function
 
+
 def initialize():
     """Read the configuration files."""
     from pwnlib.log import getLogger
+
     log = getLogger(__name__)
 
-    xdg_config_home = os.environ.get('XDG_CONFIG_HOME',
-                                     os.path.expanduser("~/.config"))
+    xdg_config_home = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
 
     c = configparser.ConfigParser()
-    c.read(['/etc/pwn.conf',
-            os.path.join(xdg_config_home, 'pwn.conf'),
-            os.path.expanduser('~/.pwn.conf')])
+    c.read(["/etc/pwn.conf", os.path.join(xdg_config_home, "pwn.conf"), os.path.expanduser("~/.pwn.conf")])
 
     for section in c.sections():
         if section not in registered_configs:

@@ -1,5 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import errno
 import select
@@ -10,6 +9,7 @@ from pwnlib.tubes.tube import tube
 
 log = getLogger(__name__)
 
+
 class sock(tube):
     """Base type used for :class:`.tubes.remote` and :class:`.tubes.listen` classes"""
 
@@ -18,13 +18,13 @@ class sock(tube):
         self.closed = {"recv": False, "send": False}
 
     # Overwritten for better usability
-    def recvall(self, timeout = tube.forever):
+    def recvall(self, timeout=tube.forever):
         """recvall() -> str
 
         Receives data until the socket is closed.
         """
 
-        if getattr(self, 'type', None) == socket.SOCK_DGRAM:
+        if getattr(self, "type", None) == socket.SOCK_DGRAM:
             self.error("UDP sockets do not support recvall")
         else:
             return super(sock, self).recvall(timeout)
@@ -39,8 +39,8 @@ class sock(tube):
                 break
             except socket.timeout:
                 return None
-            except IOError as e:
-                if e.errno in (errno.EAGAIN, errno.ETIMEDOUT) or 'timed out' in e.strerror:
+            except OSError as e:
+                if e.errno in (errno.EAGAIN, errno.ETIMEDOUT) or "timed out" in e.strerror:
                     return None
                 elif e.errno in (errno.ECONNREFUSED, errno.ECONNRESET):
                     self.shutdown("recv")
@@ -62,16 +62,16 @@ class sock(tube):
 
         try:
             self.sock.sendall(data)
-        except IOError as e:
+        except OSError as e:
             eof_numbers = (errno.EPIPE, errno.ECONNRESET, errno.ECONNREFUSED)
-            if e.errno in eof_numbers or 'Socket is closed' in e.args:
+            if e.errno in eof_numbers or "Socket is closed" in e.args:
                 self.shutdown("send")
                 raise EOFError
             else:
                 raise
 
     def settimeout_raw(self, timeout):
-        sock = getattr(self, 'sock', None)
+        sock = getattr(self, "sock", None)
         if sock:
             sock.settimeout(timeout)
 
@@ -141,9 +141,9 @@ class sock(tube):
 
         # Use poll() to determine the connection state
         want = {
-            'recv': select.POLLIN,
-            'send': select.POLLOUT,
-            'any':  select.POLLIN | select.POLLOUT,
+            "recv": select.POLLIN,
+            "send": select.POLLOUT,
+            "any": select.POLLIN | select.POLLOUT,
         }[direction]
 
         poll = select.poll()
@@ -161,20 +161,20 @@ class sock(tube):
         return True
 
     def close(self):
-        sock = getattr(self, 'sock', None)
+        sock = getattr(self, "sock", None)
         if not sock:
             return
 
         # Mark as closed in both directions
-        self.closed['send'] = True
-        self.closed['recv'] = True
+        self.closed["send"] = True
+        self.closed["recv"] = True
 
         sock.close()
         self.sock = None
         self._close_msg()
 
     def _close_msg(self):
-        self.info('Closed connection to %s port %s', self.rhost, self.rport)
+        self.info("Closed connection to %s port %s", self.rhost, self.rport)
 
     def fileno(self):
         if not self.sock:
@@ -191,7 +191,7 @@ class sock(tube):
         if direction == "send":
             try:
                 self.sock.shutdown(socket.SHUT_WR)
-            except IOError as e:
+            except OSError as e:
                 if e.errno == errno.ENOTCONN:
                     pass
                 else:
@@ -200,7 +200,7 @@ class sock(tube):
         if direction == "recv":
             try:
                 self.sock.shutdown(socket.SHUT_RD)
-            except IOError as e:
+            except OSError as e:
                 if e.errno == errno.ENOTCONN:
                     pass
                 else:
@@ -213,16 +213,14 @@ class sock(tube):
     def _get_family(cls, fam):
         if isinstance(fam, int):
             pass
-        elif fam == 'any':
+        elif fam == "any":
             fam = socket.AF_UNSPEC
-        elif fam.lower() in ['ipv4', 'ip4', 'v4', '4']:
+        elif fam.lower() in ["ipv4", "ip4", "v4", "4"]:
             fam = socket.AF_INET
-        elif fam.lower() in ['ipv6', 'ip6', 'v6', '6']:
+        elif fam.lower() in ["ipv6", "ip6", "v6", "6"]:
             fam = socket.AF_INET6
         else:
-            self.error("%s(): socket family %r is not supported",
-                       cls.__name__,
-                       fam)
+            self.error("%s(): socket family %r is not supported", cls.__name__, fam)
 
         return fam
 
@@ -235,8 +233,6 @@ class sock(tube):
         elif typ == "udp":
             typ = socket.SOCK_DGRAM
         else:
-            self.error("%s(): socket type %r is not supported",
-                       cls.__name__,
-                       typ)
+            self.error("%s(): socket type %r is not supported", cls.__name__, typ)
 
         return typ

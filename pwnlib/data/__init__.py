@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import annotations
 
 try:
     # These files are not distributed with Pwntools, but
@@ -8,5 +8,5 @@ except ImportError:
     pass
 
 import os
-path = os.path.dirname(__file__)
 
+path = os.path.dirname(__file__)

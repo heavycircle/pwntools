@@ -1,7 +1,6 @@
 # Copyright (c) 2013 Pratik Kumar Sahu, Nagendra Chowdary, Anish Mathuria
 # Ported to Python by Gallopsled
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import binascii
 import random
@@ -9,14 +8,15 @@ import string
 import sys
 
 from pwnlib.context import context
-from . import builder
 from pwnlib.encoders.encoder import Encoder
+
+from . import builder
 
 
 class ArmEncoder(Encoder):
-    arch = 'arm'
+    arch = "arm"
 
-    blacklist  = {chr(c) for c in range(256) if chr(c) in (string.ascii_letters + string.digits)}
+    blacklist = {chr(c) for c in range(256) if chr(c) in (string.ascii_letters + string.digits)}
     icache_flush = 1
 
     def __call__(self, input, avoid, pcreg=None):
@@ -45,13 +45,15 @@ class ArmEncoder(Encoder):
 
         return output.encode()
 
-class ThumbEncoder(ArmEncoder):
-    arch = 'thumb'
 
-    to_thumb = b'\x01\x30\x8f\xe2\x13\xff\x2f\xe1'
+class ThumbEncoder(ArmEncoder):
+    arch = "thumb"
+
+    to_thumb = b"\x01\x30\x8f\xe2\x13\xff\x2f\xe1"
 
     def __call__(self, input, avoid, pcreg=None):
         return super(ThumbEncoder, self).__call__(self.to_thumb + input, avoid, pcreg)
+
 
 encode = ArmEncoder()
 ThumbEncoder()

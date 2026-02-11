@@ -50,7 +50,7 @@ Example:
     61
 
 """
-from __future__ import absolute_import
+from __future__ import annotations
 
 import importlib
 import sys
@@ -67,6 +67,7 @@ class ConstantsModule(ModuleType):
     route queries down to the correct module based on the
     current context arch / os.
     """
+
     Constant = Constant
 
     possible_submodules = set(context.oses) | set(context.architectures)
@@ -91,18 +92,18 @@ class ConstantsModule(ModuleType):
     def __getattr__(self, key):
         # Special case for __all__, we want to return the contextually
         # relevant module.
-        if key == '__all__':
+        if key == "__all__":
             return list(self.guess().__dict__.keys())
 
         # Special case for all other special properties which aren't defined
-        if key.endswith('__'):
+        if key.endswith("__"):
             raise AttributeError
 
         # This code is only hit if the attribute doesn't already exist.
         # Attempt to import a module by the specified name.
         if key in self.possible_submodules:
             try:
-                mod = importlib.import_module('.' + key, self.__name__)
+                mod = importlib.import_module("." + key, self.__name__)
                 mod = ConstantsModule(mod.__name__, mod)
                 setattr(self, key, mod)
                 sys.modules[mod.__name__] = mod
@@ -143,15 +144,15 @@ class ConstantsModule(ModuleType):
 
         key = context.os, context.arch
         if key not in self._env_store:
-            self._env_store[key] = {key: getattr(self, key) for key in dir(self) if not key.endswith('__')}
+            self._env_store[key] = {key: getattr(self, key) for key in dir(self) if not key.endswith("__")}
 
         val = safeeval.values(string, self._env_store[key])
 
         # if the expression is not assembly-safe, it is not so vital to preserve it
-        if set(string) & (set(bytearray(range(32)).decode()) | set('"#$\',.;@[\\]`{}')):
+        if set(string) & (set(bytearray(range(32)).decode()) | set("\"#$',.;@[\\]`{}")):
             string = val
 
-        return Constant('(%s)' % string, val)
+        return Constant("(%s)" % string, val)
 
 
 # To prevent garbage collection

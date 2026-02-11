@@ -1,62 +1,41 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import argparse
-import sys
 
 from pwn import *
 from pwnlib.commandline import common
 
-parser = common.parser_commands.add_parser(
-    'debug',
-    help = 'Debug a binary in GDB',
-    description = 'Debug a binary in GDB'
+parser = common.parser_commands.add_parser("debug", help="Debug a binary in GDB", description="Debug a binary in GDB")
+parser.add_argument("-x", metavar="GDBSCRIPT", type=argparse.FileType("r"), help="Execute GDB commands from this file.")
+parser.add_argument("--pid", type=int, help="PID to attach to")
+parser.add_argument(
+    "-c",
+    "--context",
+    metavar="context",
+    action="append",
+    type=common.context_arg,
+    choices=common.choices,
+    help="The os/architecture/endianness/bits the shellcode will run in (default: linux/i386), choose from: %s"
+    % common.choices,
 )
 parser.add_argument(
-    '-x', metavar='GDBSCRIPT',
-    type=argparse.FileType('r'),
-    help='Execute GDB commands from this file.'
-)
-parser.add_argument(
-    '--pid',
-    type=int,
-    help="PID to attach to"
-)
-parser.add_argument(
-    '-c', '--context',
-    metavar = 'context',
-    action = 'append',
-    type   = common.context_arg,
-    choices = common.choices,
-    help = 'The os/architecture/endianness/bits the shellcode will run in (default: linux/i386), choose from: %s' % common.choices,
-)
-parser.add_argument(
-    '--exec',
-
+    "--exec",
     # NOTE: Type cannot be "file" because we may be referring to a remote
     #       file, or a file on an Android device.
     type=str,
+    dest="executable",
+    help="File to debug",
+)
+parser.add_argument("--process", metavar="PROCESS_NAME", help='Name of the process to attach to (e.g. "bash")')
+parser.add_argument("--sysroot", metavar="SYSROOT", type=str, default="", help="GDB sysroot path")
 
-    dest='executable',
-    help='File to debug'
-)
-parser.add_argument(
-    '--process', metavar='PROCESS_NAME',
-    help='Name of the process to attach to (e.g. "bash")'
-)
-parser.add_argument(
-    '--sysroot', metavar='SYSROOT',
-    type=str,
-    default='',
-    help="GDB sysroot path"
-)
 
 def main(args):
-    gdbscript = ''
+    gdbscript = ""
     if args.x:
         gdbscript = args.x.read()
 
-    if context.os == 'android':
+    if context.os == "android":
         context.device = adb.wait_for_device()
 
     if args.executable:
@@ -66,12 +45,12 @@ def main(args):
 
         # This path does nothing, but avoids the "print_usage()"
         # path below.
-        elif context.os == 'android':
+        elif context.os == "android":
             target = args.executable
     elif args.pid:
         target = int(args.pid)
     elif args.process:
-        if context.os == 'android':
+        if context.os == "android":
             target = adb.pidof(args.process)
         else:
             target = pidof(args.process)
@@ -101,5 +80,6 @@ def main(args):
     else:
         gdb.debug(target, gdbscript=gdbscript, sysroot=args.sysroot).interactive()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     pwnlib.commandline.common.main(__file__, main)

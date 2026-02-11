@@ -1,20 +1,19 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import annotations
 
 import io
-import sys
 import os
+import sys
 
-from pwnlib.term import keyconsts as kc
-from pwnlib.term import keymap as km
-from pwnlib.term import term
-from pwnlib.term import text
+from pwnlib.term import (
+    keyconsts as kc,
+    keymap as km,
+    term,
+    text,
+)
 
 cursor = text.reverse
 
-buffer_left, buffer_right = '', ''
+buffer_left, buffer_right = "", ""
 saved_buffer = None
 history = []
 history_idx = None
@@ -26,7 +25,7 @@ search_results = []
 startup_hook = None
 shutdown_hook = None
 
-delims = ' /;:.\\'
+delims = " /;:.\\"
 
 show_completion = True
 show_suggestions = False
@@ -36,13 +35,15 @@ suggest_hook = None
 
 tabs = 0
 
+
 def force_to_bytes(data):
     if isinstance(data, bytes):
         return data
     try:
-        return data.encode('utf-8')
+        return data.encode("utf-8")
     except Exception:
-        return data.encode('latin-1')
+        return data.encode("latin-1")
+
 
 def set_completer(completer):
     global complete_hook, suggest_hook
@@ -53,22 +54,24 @@ def set_completer(completer):
         complete_hook = completer.complete
         suggest_hook = completer.suggest
 
+
 def fmt_suggestions(suggestions):
     if suggestions:
-        s = ''
+        s = ""
         l = max(map(len, suggestions))
         columns = term.width // (l + 1)
         column_width = term.width // columns
-        fmt = '%%-%ds' % column_width
+        fmt = "%%-%ds" % column_width
         for j in range(0, len(suggestions), columns):
             for k in range(columns):
                 l = j + k
                 if l < len(suggestions):
                     s += fmt % suggestions[l]
-            s += '\n'
+            s += "\n"
     else:
-        s = '(no completions)\n'
+        s = "(no completions)\n"
     return s
+
 
 def auto_complete(*_):
     global show_suggestions, tabs
@@ -85,20 +88,23 @@ def auto_complete(*_):
         show_suggestions = not show_suggestions
         redisplay()
 
+
 def handle_keypress(trace):
     global tabs
     k = trace[-1]
-    if k == '<tab>':
+    if k == "<tab>":
         tabs += 1
     else:
         tabs = 0
 
+
 def clear():
     global buffer_left, buffer_right, history_idx, search_idx
-    buffer_left, buffer_right = '', ''
+    buffer_left, buffer_right = "", ""
     history_idx = None
     search_idx = None
     redisplay()
+
 
 def redisplay():
     global suggest_handle
@@ -107,11 +113,11 @@ def redisplay():
             suggestions = suggest_hook(buffer_left, buffer_right)
             if suggest_handle is None:
                 h = prompt_handle or buffer_handle
-                suggest_handle = term.output(before = h)
+                suggest_handle = term.output(before=h)
             s = fmt_suggestions(suggestions)
             suggest_handle.update(s)
         elif suggest_handle:
-            suggest_handle.update('')
+            suggest_handle.update("")
         if search_idx is None:
             s = None
             if buffer_right:
@@ -119,10 +125,8 @@ def redisplay():
             elif show_completion and complete_hook:
                 ret = complete_hook(buffer_left, buffer_right)
                 if ret:
-                    s = buffer_left + \
-                      text.underline(cursor(ret[0])) + \
-                      text.underline(ret[1:])
-            s = s or buffer_left + cursor(' ')
+                    s = buffer_left + text.underline(cursor(ret[0])) + text.underline(ret[1:])
+            s = s or buffer_left + cursor(" ")
             buffer_handle.update(s)
         else:
             if search_results != []:
@@ -132,7 +136,8 @@ def redisplay():
                 s = a + text.bold_green(b) + c
             else:
                 s = text.white_on_red(buffer_left)
-            buffer_handle.update('(search) ' + s)
+            buffer_handle.update("(search) " + s)
+
 
 def self_insert(trace):
     if len(trace) != 1:
@@ -141,11 +146,13 @@ def self_insert(trace):
     if k.type == kc.TYPE_UNICODE and k.mods == kc.MOD_NONE:
         insert_text(k.code)
 
+
 def set_buffer(left, right):
     global buffer_left, buffer_right
     buffer_left = left
     buffer_right = right
     redisplay()
+
 
 def cancel_search(*_):
     global search_idx
@@ -153,12 +160,14 @@ def cancel_search(*_):
         search_idx = None
         redisplay()
 
+
 def commit_search():
     global search_idx
     if search_idx is not None and search_results:
-        set_buffer(history[search_results[search_idx][0]], '')
+        set_buffer(history[search_results[search_idx][0]], "")
         search_idx = None
         redisplay()
+
 
 def update_search_results():
     global search_results, search_idx, show_suggestions
@@ -175,22 +184,24 @@ def update_search_results():
         return
     for idx, h in enumerate(history):
         for i in range(0, len(h) - len(buffer_left) + 1):
-            if h[i:i + len(buffer_left)] == buffer_left:
+            if h[i : i + len(buffer_left)] == buffer_left:
                 if hidx is not None and idx == hidx:
                     search_idx = len(search_results)
                 search_results.append((idx, i, i + len(buffer_left)))
                 break
 
+
 def search_history(*_):
     global buffer_left, buffer_right, history_idx, search_idx
     if search_idx is None:
-        buffer_left, buffer_right = buffer_left + buffer_right, ''
+        buffer_left, buffer_right = buffer_left + buffer_right, ""
         history_idx = None
         search_idx = 0
         update_search_results()
     elif search_results:
         search_idx = (search_idx + 1) % len(search_results)
     redisplay()
+
 
 def history_prev(*_):
     global history_idx, saved_buffer
@@ -202,7 +213,8 @@ def history_prev(*_):
         history_idx = -1
     if history_idx < len(history) - 1:
         history_idx += 1
-        set_buffer(history[history_idx], '')
+        set_buffer(history[history_idx], "")
+
 
 def history_next(*_):
     global history_idx, saved_buffer
@@ -215,7 +227,8 @@ def history_next(*_):
         saved_buffer = None
     else:
         history_idx -= 1
-        set_buffer(history[history_idx], '')
+        set_buffer(history[history_idx], "")
+
 
 def backward_char(*_):
     global buffer_left, buffer_right
@@ -225,6 +238,7 @@ def backward_char(*_):
         buffer_left = buffer_left[:-1]
     redisplay()
 
+
 def forward_char(*_):
     global buffer_left, buffer_right
     commit_search()
@@ -232,6 +246,7 @@ def forward_char(*_):
         buffer_left += buffer_right[0]
         buffer_right = buffer_right[1:]
     redisplay()
+
 
 def insert_text(s):
     global history_idx, saved_buffer, buffer_left
@@ -242,11 +257,13 @@ def insert_text(s):
     update_search_results()
     redisplay()
 
+
 def submit(*_):
     if search_idx is not None:
         commit_search()
     else:
         keymap.stop()
+
 
 def control_c(*_):
     global history_idx, saved_buffer
@@ -261,6 +278,7 @@ def control_c(*_):
     else:
         raise KeyboardInterrupt
 
+
 def control_d(*_):
     if buffer_left or buffer_right:
         return
@@ -268,11 +286,13 @@ def control_d(*_):
     eof = True
     keymap.stop()
 
+
 def kill_to_end(*_):
     global buffer_right
     commit_search()
     buffer_right = []
     redisplay()
+
 
 def delete_char_forward(*_):
     global buffer_right
@@ -281,12 +301,14 @@ def delete_char_forward(*_):
         buffer_right = buffer_right[1:]
         redisplay()
 
+
 def delete_char_backward(*_):
     global buffer_left
     if buffer_left:
         buffer_left = buffer_left[:-1]
         update_search_results()
         redisplay()
+
 
 def kill_word_backward(*_):
     global buffer_left
@@ -301,6 +323,7 @@ def kill_word_backward(*_):
             flag = True
         buffer_left = buffer_left[:-1]
     redisplay()
+
 
 def backward_word(*_):
     global buffer_left, buffer_right
@@ -317,6 +340,7 @@ def backward_word(*_):
         buffer_left = buffer_left[:-1]
     redisplay()
 
+
 def forward_word(*_):
     global buffer_left, buffer_right
     commit_search()
@@ -332,61 +356,67 @@ def forward_word(*_):
         buffer_right = buffer_right[1:]
     redisplay()
 
+
 def go_beginning(*_):
     commit_search()
-    set_buffer('', buffer_left + buffer_right)
+    set_buffer("", buffer_left + buffer_right)
+
 
 def go_end(*_):
     commit_search()
-    set_buffer(buffer_left + buffer_right, '')
+    set_buffer(buffer_left + buffer_right, "")
 
-keymap = km.Keymap({
-    '<nomatch>'   : self_insert,
-    '<up>'        : history_prev,
-    '<down>'      : history_next,
-    '<left>'      : backward_char,
-    '<right>'     : forward_char,
-    '<del>'       : delete_char_backward,
-    '<delete>'    : delete_char_forward,
-    '<enter>'     : submit,
-    'C-j'         : submit,
-    'C-<left>'    : backward_word,
-    'C-<right>'   : forward_word,
-    'M-<left>'    : backward_word,
-    'M-<right>'   : forward_word,
-    'C-c'         : control_c,
-    'C-d'         : control_d,
-    'C-k'         : kill_to_end,
-    'C-w'         : kill_word_backward,
-    '<backspace>' : kill_word_backward,
-    'M-<del>'     : kill_word_backward,
-    'C-r'         : search_history,
-    '<escape>'    : cancel_search,
-    'C-a'         : go_beginning,
-    'C-e'         : go_end,
-    '<tab>'       : auto_complete,
-    '<any>'       : handle_keypress,
-    })
 
-def readline(_size=-1, prompt='', float=True, priority=10):
+keymap = km.Keymap(
+    {
+        "<nomatch>": self_insert,
+        "<up>": history_prev,
+        "<down>": history_next,
+        "<left>": backward_char,
+        "<right>": forward_char,
+        "<del>": delete_char_backward,
+        "<delete>": delete_char_forward,
+        "<enter>": submit,
+        "C-j": submit,
+        "C-<left>": backward_word,
+        "C-<right>": forward_word,
+        "M-<left>": backward_word,
+        "M-<right>": forward_word,
+        "C-c": control_c,
+        "C-d": control_d,
+        "C-k": kill_to_end,
+        "C-w": kill_word_backward,
+        "<backspace>": kill_word_backward,
+        "M-<del>": kill_word_backward,
+        "C-r": search_history,
+        "<escape>": cancel_search,
+        "C-a": go_beginning,
+        "C-e": go_end,
+        "<tab>": auto_complete,
+        "<any>": handle_keypress,
+    }
+)
+
+
+def readline(_size=-1, prompt="", float=True, priority=10):
     # The argument  _size is unused, but is there for compatibility
     # with the existing readline
 
-    global buffer_handle, prompt_handle, suggest_handle, eof, \
-        show_suggestions
+    global buffer_handle, prompt_handle, suggest_handle, eof, show_suggestions
 
     # XXX circular imports
     from pwnlib.term import term_mode
+
     if not term_mode:
-        print(prompt, end='', flush=True)
-        return getattr(sys.stdin, 'buffer', sys.stdin).readline(_size).rstrip(b'\n')
+        print(prompt, end="", flush=True)
+        return getattr(sys.stdin, "buffer", sys.stdin).readline(_size).rstrip(b"\n")
     show_suggestions = False
     eof = False
     if prompt:
-        prompt_handle = term.output(prompt, float = float, priority = priority)
+        prompt_handle = term.output(prompt, float=float, priority=priority)
     else:
         prompt_handle = None
-    buffer_handle = term.output(float = float, priority = priority)
+    buffer_handle = term.output(float=float, priority=priority)
     suggest_handle = None
     clear()
     if startup_hook:
@@ -398,14 +428,14 @@ def readline(_size=-1, prompt='', float=True, priority=10):
                     keymap.handle_input()
                 except EOFError:
                     if len(buffer_left + buffer_right) == 0:
-                        return b''
+                        return b""
                 if eof:
-                    return b''
+                    return b""
                 else:
-                    buffer = (buffer_left + buffer_right)
+                    buffer = buffer_left + buffer_right
                     if buffer:
                         history.insert(0, buffer)
-                    return force_to_bytes(buffer) + b'\n'
+                    return force_to_bytes(buffer) + b"\n"
             except KeyboardInterrupt:
                 do_raise = False
                 try:
@@ -415,7 +445,7 @@ def readline(_size=-1, prompt='', float=True, priority=10):
                 if do_raise:
                     raise
     finally:
-        line = buffer_left + buffer_right + '\n'
+        line = buffer_left + buffer_right + "\n"
         buffer_handle.update(line)
         buffer_handle = None
         if prompt_handle:
@@ -425,7 +455,8 @@ def readline(_size=-1, prompt='', float=True, priority=10):
         if shutdown_hook:
             shutdown_hook()
 
-def raw_input(prompt='', float=True):
+
+def raw_input(prompt="", float=True):
     r"""raw_input(prompt='', float=True)
 
     Replacement for the built-in ``raw_input`` using ``pwnlib`` readline
@@ -438,7 +469,8 @@ def raw_input(prompt='', float=True):
     """
     return readline(-1, prompt, float).rstrip(os.linesep.encode())
 
-def str_input(prompt='', float=True):
+
+def str_input(prompt="", float=True):
     r"""str_input(prompt='', float=True)
 
     Replacement for the built-in ``input`` in python3 using ``pwnlib`` readline
@@ -451,7 +483,8 @@ def str_input(prompt='', float=True):
     """
     return readline(-1, prompt, float).decode().rstrip(os.linesep)
 
-def eval_input(prompt='', float=True):
+
+def eval_input(prompt="", float=True):
     """eval_input(prompt='', float=True)
 
     Replacement for the built-in python 2 - style ``input`` using
@@ -475,25 +508,31 @@ def eval_input(prompt='', float=True):
         Favorite object? 20
     """
     from pwnlib.util import safeeval
+
     return safeeval.const(readline(-1, prompt, float).rstrip(os.linesep.encode()))
+
 
 def init():
     global safeeval
     # defer imports until initialization
-    import sys
     import builtins
+    import sys
+
     from pwnlib.util import safeeval
 
     class Wrapper:
         def __init__(self, fd):
             self._fd = fd
-        def readline(self, size = None):
+
+        def readline(self, size=None):
             r = readline(size)
             if isinstance(self._fd, io.TextIOWrapper):
                 r = r.decode(encoding=self._fd.encoding, errors=self._fd.errors)
             return r
+
         def __getattr__(self, k):
             return getattr(self._fd, k)
+
     sys.stdin = Wrapper(sys.stdin)
 
     builtins.input = str_input

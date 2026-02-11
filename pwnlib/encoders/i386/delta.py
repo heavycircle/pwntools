@@ -1,18 +1,11 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import collections
-from random import choice
-from random import randint
+from random import choice, randint
 
-from pwnlib.asm import asm
-from pwnlib.asm import disasm
-from pwnlib.context import context
 from pwnlib.encoders.encoder import Encoder
-from pwnlib.util.fiddling import hexdump
 
-
-'''
+"""
 base:
     fnop
     cld
@@ -31,7 +24,8 @@ next:
     jnz         next
 
 data:
-'''
+"""
+
 
 class i386DeltaEncoder(Encoder):
     r"""
@@ -47,14 +41,14 @@ class i386DeltaEncoder(Encoder):
         -5
     """
 
-    arch       = 'i386'
-    stub       = None
-    terminator = 0xac
-    raw        = b'\xd9\xd0\xfc\xd9t$\xf4^\x83\xc6\x18\x89\xf7\xac\x93\xac(\xd8\xaa\x80\xeb\xacu\xf5'
+    arch = "i386"
+    stub = None
+    terminator = 0xAC
+    raw = b"\xd9\xd0\xfc\xd9t$\xf4^\x83\xc6\x18\x89\xf7\xac\x93\xac(\xd8\xaa\x80\xeb\xacu\xf5"
 
-    blacklist  = set(raw)
+    blacklist = set(raw)
 
-    def __call__(self, raw_bytes, avoid, pcreg=''):
+    def __call__(self, raw_bytes, avoid, pcreg=""):
         table = collections.defaultdict(lambda: [])
         endchar = bytearray()
 
@@ -64,14 +58,14 @@ class i386DeltaEncoder(Encoder):
         for i in filter(not_bad_or_term, range(0, 256)):
             endchar.append(i)
             for j in filter(not_bad, range(0, 256)):
-                table[(j - i) & 0xff].append(bytearray([i, j]))
+                table[(j - i) & 0xFF].append(bytearray([i, j]))
 
         res = bytearray(self.raw)
 
         for c in bytearray(raw_bytes):
             l = len(table[c])
             if l == 0:
-                print('No encodings for character %02x' % c)
+                print("No encodings for character %02x" % c)
                 return None
 
             res += table[c][randint(0, l - 1)]
@@ -80,5 +74,6 @@ class i386DeltaEncoder(Encoder):
         res.append(choice(endchar))
 
         return bytes(res)
+
 
 encode = i386DeltaEncoder()

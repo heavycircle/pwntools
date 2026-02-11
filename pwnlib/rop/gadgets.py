@@ -1,6 +1,7 @@
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
-class Gadget(object):
+
+class Gadget:
     """
     Describes a ROP gadget
     """
@@ -39,18 +40,14 @@ class Gadget(object):
 
     def __init__(self, address, insns, regs, move):
         self.address = int(address)
-        self.insns   = insns
-        self.regs    = regs
-        self.move    = move
+        self.insns = insns
+        self.regs = regs
+        self.move = move
 
-    __indices = ['address', 'details']
+    __indices = ["address", "details"]
 
     def __repr__(self):
-        return "%s(%#x, %r, %r, %#x)" % (self.__class__.__name__,
-                                         self.address,
-                                         self.insns,
-                                         self.regs,
-                                         self.move)
+        return "%s(%#x, %r, %r, %#x)" % (self.__class__.__name__, self.address, self.insns, self.regs, self.move)
 
     def __getitem__(self, key):
         # Backward compatibility

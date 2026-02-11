@@ -1,9 +1,7 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import glob
 import platform
-import sys
 import time
 
 import serial
@@ -13,36 +11,46 @@ from pwnlib.tubes import tube
 
 log = getLogger(__name__)
 
+
 class serialtube(tube.tube):
     def __init__(
-            self, port = None, baudrate = 115200,
-            convert_newlines = True,
-            bytesize = 8, parity='N', stopbits=1, xonxoff = False,
-            rtscts = False, dsrdtr = False, *a, **kw):
+        self,
+        port=None,
+        baudrate=115200,
+        convert_newlines=True,
+        bytesize=8,
+        parity="N",
+        stopbits=1,
+        xonxoff=False,
+        rtscts=False,
+        dsrdtr=False,
+        *a,
+        **kw,
+    ):
         super(serialtube, self).__init__(*a, **kw)
 
         if port is None:
-            if platform.system() == 'Darwin':
-                port = glob.glob('/dev/tty.usbserial*')[0]
+            if platform.system() == "Darwin":
+                port = glob.glob("/dev/tty.usbserial*")[0]
             else:
-                port = '/dev/ttyUSB0'
+                port = "/dev/ttyUSB0"
 
         self.convert_newlines = convert_newlines
         # serial.Serial might throw an exception, which must be handled
         # and propagated accordingly using self.exception
         try:
             self.conn = serial.Serial(
-                port = port,
-                baudrate = baudrate,
-                bytesize = bytesize,
-                parity = parity,
-                stopbits = stopbits,
-                timeout = 0,
-                xonxoff = xonxoff,
-                rtscts = rtscts,
-                writeTimeout = None,
-                dsrdtr = dsrdtr,
-                interCharTimeout = 0
+                port=port,
+                baudrate=baudrate,
+                bytesize=bytesize,
+                parity=parity,
+                stopbits=stopbits,
+                timeout=0,
+                xonxoff=xonxoff,
+                rtscts=rtscts,
+                writeTimeout=None,
+                dsrdtr=dsrdtr,
+                interCharTimeout=0,
             )
         except serial.SerialException:
             # self.conn is set to None to avoid an AttributeError when
@@ -72,7 +80,7 @@ class serialtube(tube.tube):
             raise EOFError
 
         if self.convert_newlines:
-            data = data.replace(b'\n', b'\r\n')
+            data = data.replace(b"\n", b"\r\n")
 
         while data:
             n = self.conn.write(data)

@@ -1,29 +1,18 @@
-from __future__ import absolute_import
-from __future__ import division
-
-import argparse
-import sys
+from __future__ import annotations
 
 from pwn import *
 from pwnlib.commandline import common
 
 parser = common.parser_commands.add_parser(
-    'checksec',
-    help = 'Check binary security settings',
-    description = 'Check binary security settings',
+    "checksec",
+    help="Check binary security settings",
+    description="Check binary security settings",
 )
+parser.add_argument("elf", nargs="*", help="Files to check")
 parser.add_argument(
-    'elf',
-    nargs='*',
-    help='Files to check'
+    "--file", nargs="*", dest="elf2", metavar="elf", help="File to check (for compatibility with checksec.sh)"
 )
-parser.add_argument(
-    '--file',
-    nargs='*',
-    dest='elf2',
-    metavar='elf',
-    help='File to check (for compatibility with checksec.sh)'
-)
+
 
 def main(args):
     files = args.elf or args.elf2 or []
@@ -36,7 +25,8 @@ def main(args):
         try:
             e = ELF(f)
         except Exception as e:
-            print("{name}: {error}".format(name=f, error=e))
+            print(f"{f}: {e}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     common.main(__file__, main)

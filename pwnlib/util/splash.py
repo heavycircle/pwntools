@@ -1,6 +1,6 @@
 """Silly module mostly meant as an easter-egg."""
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import threading
 import time
@@ -8,8 +8,7 @@ import time
 from pwnlib import term
 from pwnlib.term import text
 
-
-_banner = r'''
+_banner = r"""
   .:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:.
   )     _____                         _    _                            )
   (    |  _  |___ _ _ _ ___ ___ ___ _| |  | |_ _ _                      (
@@ -24,34 +23,42 @@ _banner = r'''
   )             \/_/  \/__//__/   \/_/\/_/    \/_____/ \/_/\/___/       )
   (                                                                     (
   .:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:._.:*~*:.
-'''
+"""
+
 
 def splash():
     """Put this at the beginning of your exploit to create the illusion that
     your sploit is enterprisey and top notch quality"""
 
     def updater():
-
         colors = [
-            text.blue   , text.bold_blue   ,
-            text.magenta, text.bold_magenta,
-            text.red    , text.bold_red    ,
-            text.yellow , text.bold_yellow ,
-            text.green  , text.bold_green  ,
-            text.cyan   , text.bold_cyan   ,
+            text.blue,
+            text.bold_blue,
+            text.magenta,
+            text.bold_magenta,
+            text.red,
+            text.bold_red,
+            text.yellow,
+            text.bold_yellow,
+            text.green,
+            text.bold_green,
+            text.cyan,
+            text.bold_cyan,
         ]
+
         def getcolor(n):
             return colors[(n // 4) % len(colors)]
 
-        lines = ['    ' + line + '\n' for line in _banner.strip('\n').split('\n')]
+        lines = ["    " + line + "\n" for line in _banner.strip("\n").split("\n")]
 
-        hs = [term.output('', frozen = False) for _ in range(len(lines))]
+        hs = [term.output("", frozen=False) for _ in range(len(lines))]
         ndx = 0
         import sys as _sys
+
         while _sys:
             for i, (l, h) in enumerate(zip(lines, hs)):
-                cur = ''
-                buf = ''
+                cur = ""
+                buf = ""
                 col = getcolor(ndx + i)
                 for j in range(len(l)):
                     buf += l[j]
@@ -59,14 +66,14 @@ def splash():
                     if col != ncol:
                         cur += buf if buf.isspace() else col(buf)
                         col = ncol
-                        buf = ''
+                        buf = ""
                 cur += col(buf)
                 h.update(cur)
             ndx += 1
             time.sleep(0.15)
 
     if term.term_mode:
-        t = threading.Thread(target = updater)
+        t = threading.Thread(target=updater)
         t.daemon = True
         t.start()
         time.sleep(0.2)

@@ -16,7 +16,7 @@ We use the following example program:
     }
 
 We can automate the  process of exploitation with these some example binaries.
-    
+
     >>> context.binary = elf = ELF(pwnlib.data.elf.ret2dlresolve.get('i386'))
     >>> rop = ROP(context.binary)
     >>> dlresolve = Ret2dlresolvePayload(elf, symbol="system", args=["echo pwned"])
@@ -64,22 +64,25 @@ You can also use ``Ret2dlresolve`` on AMD64:
     ...     p.recvline() == b'pwned\n'
     True
 """
+from __future__ import annotations
 
 from copy import deepcopy
 
 from pwnlib.context import context
 from pwnlib.log import getLogger
+from pwnlib.util.misc import align
 from pwnlib.util.packing import *
 from pwnlib.util.packing import _need_bytes
-from pwnlib.util.misc import align
 
 log = getLogger(__name__)
 
 ELF32_R_SYM_SHIFT = 8
 ELF64_R_SYM_SHIFT = 32
 
-class Elf32_Rel(object):
-    ''
+
+class Elf32_Rel:
+    ""
+
     """
     .. code-block:: c
 
@@ -88,7 +91,8 @@ class Elf32_Rel(object):
             Elf32_Word	r_info;
         } Elf32_Rel;
     """
-    size=1 # see _build_structures method for explanation
+    size = 1  # see _build_structures method for explanation
+
     def __init__(self, r_offset=0, r_info=0):
         self.r_offset = r_offset
         self.r_info = r_info
@@ -100,8 +104,9 @@ class Elf32_Rel(object):
         return self.__flat__()
 
 
-class Elf64_Rel(object):
-    ''
+class Elf64_Rel:
+    ""
+
     """
     .. code-block:: c
 
@@ -110,7 +115,8 @@ class Elf64_Rel(object):
             Elf64_Xword r_info;
         } Elf64_Rel;
     """
-    size=24
+    size = 24
+
     def __init__(self, r_offset=0, r_info=0):
         self.r_offset = r_offset
         self.r_info = r_info
@@ -122,8 +128,9 @@ class Elf64_Rel(object):
         return self.__flat__()
 
 
-class Elf32_Sym(object):
-    ''
+class Elf32_Sym:
+    ""
+
     """
     .. code-block:: c
 
@@ -137,6 +144,7 @@ class Elf32_Sym(object):
         } Elf32_Sym;
     """
     size = 16
+
     def __init__(self, st_name=0, st_value=0, st_size=0, st_info=0, st_other=0, st_shndx=0):
         self.st_name = st_name
         self.st_value = st_value
@@ -146,19 +154,22 @@ class Elf32_Sym(object):
         self.st_shndx = st_shndx
 
     def __flat__(self):
-        return p32(self.st_name) + \
-            p32(self.st_value) + \
-            p32(self.st_size) + \
-            p8(self.st_info) + \
-            p8(self.st_other) + \
-            p16(self.st_shndx)
+        return (
+            p32(self.st_name)
+            + p32(self.st_value)
+            + p32(self.st_size)
+            + p8(self.st_info)
+            + p8(self.st_other)
+            + p16(self.st_shndx)
+        )
 
     def __bytes__(self):
         return self.__flat__()
 
 
-class Elf64_Sym(object):
-    ''
+class Elf64_Sym:
+    ""
+
     """
     .. code-block:: c
 
@@ -171,7 +182,8 @@ class Elf64_Sym(object):
             Elf64_Xword st_size;
         } Elf64_Sym;
     """
-    size=24
+    size = 24
+
     def __init__(self, st_name=0, st_value=0, st_size=0, st_info=0, st_other=0, st_shndx=0):
         self.st_name = st_name
         self.st_value = st_value
@@ -181,19 +193,22 @@ class Elf64_Sym(object):
         self.st_shndx = st_shndx
 
     def __flat__(self):
-        return p32(self.st_name) + \
-            p8(self.st_info) + \
-            p8(self.st_other) + \
-            p16(self.st_shndx) + \
-            p64(self.st_value) + \
-            p64(self.st_size)
+        return (
+            p32(self.st_name)
+            + p8(self.st_info)
+            + p8(self.st_other)
+            + p16(self.st_shndx)
+            + p64(self.st_value)
+            + p64(self.st_size)
+        )
 
     def __bytes__(self):
         return self.__flat__()
 
 
 class Queue(list):
-    ''
+    ""
+
     def size(self):
         size = 0
         for v in self:
@@ -207,18 +222,19 @@ class Queue(list):
 
 
 class MarkedBytes(bytes):
-    ''
+    ""
+
     pass
 
 
-class Ret2dlresolvePayload(object):
+class Ret2dlresolvePayload:
     """Create a ret2dlresolve payload
 
     Arguments:
         elf (ELF): Binary to search
         symbol (str): Function to search for
         args (list): List of arguments to pass to the function
-        data_addr (int|None): The address where the payload will 
+        data_addr (int|None): The address where the payload will
             be written to. If not provided, a suitable address will
             be chosen automatically (recommended).
         resolution_addr (int|None): The address where the location
@@ -229,12 +245,13 @@ class Ret2dlresolvePayload(object):
         A ``Ret2dlresolvePayload`` object. It can be passed to ``rop.ret2dlresolve``
         for automatic exploitation.
 
-        If that is not suitable the object generates useful values (.reloc_index 
+        If that is not suitable the object generates useful values (.reloc_index
         and .payload) which can be used to aid manual exploitation. In this case
         it is recommended to set .resolution_addr to the GOT address of an easily
-        callable function (do not set it when passing the object to 
+        callable function (do not set it when passing the object to
         rop.ret2dlresolve).
     """
+
     def __init__(self, elf, symbol, args, data_addr=None, resolution_addr=None):
         self.elf = elf
         self.elf_load_address_fixup = self.elf.address - self.elf.load_addr
@@ -264,7 +281,7 @@ class Ret2dlresolvePayload(object):
         # Encode every string in args
         def aux(args):
             for i, arg in enumerate(args):
-                if isinstance(arg, (str,bytes)):
+                if isinstance(arg, (str, bytes)):
                     args[i] = _need_bytes(args[i], min_wrong=0x80) + b"\x00"
                 elif isinstance(arg, (list, tuple)):
                     aux(arg)
@@ -277,7 +294,7 @@ class Ret2dlresolvePayload(object):
         bss = self.elf.get_section_by_name(".bss").header.sh_addr + self.elf_load_address_fixup
         bss_size = self.elf.get_section_by_name(".bss").header.sh_size
         addr = bss + bss_size
-        addr = addr + (-addr & 0xfff) - 0x200 #next page in memory - 0x200
+        addr = addr + (-addr & 0xFFF) - 0x200  # next page in memory - 0x200
         return addr
 
     def _build_structures(self):
@@ -295,7 +312,7 @@ class Ret2dlresolvePayload(object):
 
         # where the address of the symbol will be saved
         # (ElfRel.r_offset points here)
-        symbol_space = b"A"*context.bytes
+        symbol_space = b"A" * context.bytes
 
         # Symbol name. Ej: system
         symbol_name_addr = self.data_addr + len(self.payload)
@@ -303,7 +320,7 @@ class Ret2dlresolvePayload(object):
         symbol_end_addr = symbol_name_addr + len(symbol_name)
 
         # ElfSym
-        index = align(ElfSym.size, symbol_end_addr - self.symtab) // ElfSym.size # index for both symtab and versym
+        index = align(ElfSym.size, symbol_end_addr - self.symtab) // ElfSym.size  # index for both symtab and versym
         sym_addr = self.symtab + ElfSym.size * index
         sym = ElfSym(st_name=symbol_name_addr - self.strtab)
         sym_end_addr = sym_addr + sym.size
@@ -315,19 +332,24 @@ class Ret2dlresolvePayload(object):
         # ElfRel
         rel_addr = self.jmprel + self.reloc_index * ElfRel.size
         rel_type = 7
-        rel = ElfRel(r_offset=self.resolution_addr, r_info=(index<<ELF_R_SYM_SHIFT)+rel_type)
-        
+        rel = ElfRel(r_offset=self.resolution_addr, r_info=(index << ELF_R_SYM_SHIFT) + rel_type)
+
         # When a program's PIE is enabled, r_offset should be the relative address, not the absolute address
         if self.elf.pie:
-            rel = ElfRel(r_offset=self.resolution_addr - (self.elf.load_addr + self.elf_load_address_fixup), r_info=(index<<ELF_R_SYM_SHIFT)+rel_type)
-        
-        self.payload = fit({
-            symbol_name_addr - self.data_addr: symbol_name,
-            sym_addr - self.data_addr: sym,
-            rel_addr - self.data_addr: rel
-        })
+            rel = ElfRel(
+                r_offset=self.resolution_addr - (self.elf.load_addr + self.elf_load_address_fixup),
+                r_info=(index << ELF_R_SYM_SHIFT) + rel_type,
+            )
 
-        ver_addr = self.versym + 2 * index # Elf_HalfWord
+        self.payload = fit(
+            {
+                symbol_name_addr - self.data_addr: symbol_name,
+                sym_addr - self.data_addr: sym,
+                rel_addr - self.data_addr: rel,
+            }
+        )
+
+        ver_addr = self.versym + 2 * index  # Elf_HalfWord
 
         log.debug("Symtab: %s", hex(self.symtab))
         log.debug("Strtab: %s", hex(self.strtab))
@@ -340,10 +362,13 @@ class Ret2dlresolvePayload(object):
         log.debug("Data addr: %s", hex(self.data_addr))
         log.debug("Resolution addr: %s", hex(self.resolution_addr))
         if not self.elf.memory[ver_addr]:
-            log.warn("Ret2dlresolve is likely impossible in this ELF "
-                     "(too big gap between text and writable sections).\n"
-                     "If you get a segmentation fault with fault_addr = %#x, "
-                     "try a different technique.", ver_addr)
+            log.warn(
+                "Ret2dlresolve is likely impossible in this ELF "
+                "(too big gap between text and writable sections).\n"
+                "If you get a segmentation fault with fault_addr = %#x, "
+                "try a different technique.",
+                ver_addr,
+            )
             self.unreliable = True
 
     def _build_args(self):

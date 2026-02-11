@@ -1,19 +1,17 @@
-# -*- coding: utf-8 -*-
 """
 Topographical sort
 """
-from __future__ import absolute_import
-from __future__ import division
 
-from collections import OrderedDict
+from __future__ import annotations
+
 from collections import defaultdict
-from random import randint
-from random import shuffle
+from random import randint, shuffle
 
 from pwnlib.context import context
 from pwnlib.log import getLogger
 
 log = getLogger(__name__)
+
 
 def check_cycle(reg, assignments, mapping=None):
     """Walk down the assignment list of a register,
@@ -41,11 +39,12 @@ def check_cycle(reg, assignments, mapping=None):
         mapping = {}
     return check_cycle_(reg, assignments, [], mapping)
 
+
 def check_cycle_(reg, assignments, path, mapping):
     target = assignments.get(reg)
     if target is None:
         real_reg = mapping.get(reg, reg)
-        reg, target = next((k, v) for k,v in assignments.items() if mapping.get(k, k) == real_reg)
+        reg, target = next((k, v) for k, v in assignments.items() if mapping.get(k, k) == real_reg)
     path.append(reg)
 
     real_target = mapping.get(target, target)
@@ -68,6 +67,7 @@ def check_cycle_(reg, assignments, path, mapping):
     # Recurse
     return check_cycle_(target, assignments, path, mapping)
 
+
 def extract_dependencies(reg, assignments, mapping=None):
     """Return a list of all registers which directly
     depend on the specified register.
@@ -86,7 +86,7 @@ def extract_dependencies(reg, assignments, mapping=None):
     # sorted() is only for determinism
     if mapping is None:
         mapping = {}
-    return sorted([k for k,v in assignments.items() if mapping.get(v, v) == mapping.get(reg, reg)])
+    return sorted([k for k, v in assignments.items() if mapping.get(v, v) == mapping.get(reg, reg)])
 
 
 def resolve_order(reg, deps):
@@ -112,6 +112,7 @@ def resolve_order(reg, deps):
     x.append(reg)
     return x
 
+
 def depends_on_cycle(reg, assignments, in_cycles):
     while reg in assignments:
         if reg in in_cycles:
@@ -119,7 +120,8 @@ def depends_on_cycle(reg, assignments, in_cycles):
         reg = assignments.get(reg, None)
     return False
 
-def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize = None):
+
+def regsort(in_out, all_regs, mapping=None, tmp=None, xchg=True, randomize=None):
     """
     Sorts register dependencies.
 
@@ -243,7 +245,7 @@ def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize
         randomize = context.randomize
 
     if mapping is None:
-        if hasattr(all_regs, 'keys'):
+        if hasattr(all_regs, "keys"):
             mapping = all_regs
         else:
             mapping = {}
@@ -253,19 +255,19 @@ def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize
     # Drop all registers which will be set to themselves.
     #
     # For example, {'eax': 'eax'}
-    in_out = {k:v for k,v in in_out.items() if k != v}
+    in_out = {k: v for k, v in in_out.items() if k != v}
 
     # Collapse constant values
     #
     # For example, {'eax': 0, 'ebx': 0} => {'eax': 0, 'ebx': 'eax'}
     v_k = defaultdict(list)
-    for k,v in sorted(in_out.items()):
+    for k, v in sorted(in_out.items()):
         if v not in all_regs and v != 0:
             v_k[v].append(k)
 
     post_mov = {}
 
-    for v,ks in sorted(v_k.items(), key=repr):
+    for v, ks in sorted(v_k.items(), key=repr):
         for k in ks[1:]:
             post_mov[k] = ks[0]
             in_out.pop(k)
@@ -281,13 +283,13 @@ def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize
     inps = {mapping.get(k, k) for k in in_out}
     outs = {mapping.get(v, v) for v in in_out.values()}
     if not inps & outs:
-        result = [('mov', k,in_out[k]) for k in sorted(in_out)]
+        result = [("mov", k, in_out[k]) for k in sorted(in_out)]
 
         if randomize:
             shuffle(result)
 
         for dreg, sreg in sorted(post_mov.items()):
-            result.append(('mov', dreg, sreg))
+            result.append(("mov", dreg, sreg))
 
         return result
 
@@ -297,7 +299,7 @@ def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize
     # Output:  {'A': [], 'B': ['A', 'C'], 'C': []}
     #
     # In this case, both A and C must be set before B.
-    deps  = {r: extract_dependencies(r, in_out, mapping) for r in in_out}
+    deps = {r: extract_dependencies(r, in_out, mapping) for r in in_out}
 
     # Final result which will be returned
     result = []
@@ -307,22 +309,21 @@ def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize
     # Given that everything is single-assignment, the cycles
     # are guarnteed to be disjoint.
     cycle_candidates = sorted(list(in_out))
-    cycles           = []
-    in_cycle         = []
-    not_in_cycle     = []
+    cycles = []
+    in_cycle = []
+    not_in_cycle = []
 
     if randomize:
         shuffle(cycle_candidates)
 
     while cycle_candidates:
-        reg   = cycle_candidates[0]
+        reg = cycle_candidates[0]
         cycle = check_cycle(reg, in_out, mapping)
 
         if cycle:
             if randomize:
                 x = randint(0, len(cycle))
                 cycle = cycle[x:] + cycle[:x]
-
 
             cycles.append(cycle)
             in_cycle.extend(cycle)
@@ -363,9 +364,8 @@ def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize
                 tmp = reg
                 break
         else:
-            nope = sorted((k,v) for k,v in in_out.items())
+            nope = sorted((k, v) for k, v in in_out.items())
             log.error("Cannot break dependency cycles in %r" % nope)
-
 
     # Don't set the temporary register now
     if tmp in not_in_cycle:
@@ -376,7 +376,7 @@ def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize
         shuffle(not_in_cycle)
 
     while not_in_cycle:
-        reg   = not_in_cycle[0]
+        reg = not_in_cycle[0]
         order = resolve_order(reg, deps)
 
         for reg in order:
@@ -384,14 +384,13 @@ def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize
             if reg not in not_in_cycle:
                 continue
 
-            src =  in_out[reg]
-            result.append(('mov', reg, src))
+            src = in_out[reg]
+            result.append(("mov", reg, src))
             not_in_cycle.remove(reg)
 
             # Mark this as resolved
             if reg in deps.get(src, []):
                 deps[src].remove(reg)
-
 
     # If using a temporary register, break each cycle individually
     #
@@ -414,35 +413,35 @@ def regsort(in_out, all_regs, mapping = None, tmp = None, xchg = True, randomize
         for cycle in cycles:
             if len(cycle) == 1:
                 [reg] = cycle
-                result.append(('mov', reg, in_out[reg]))
+                result.append(("mov", reg, in_out[reg]))
                 continue
 
             first = cycle[0]
-            last  = cycle[-1]
+            last = cycle[-1]
 
             deps[first].remove(last)
             in_out[last] = tmp
 
             order = resolve_order(last, deps)
 
-            result.append(('mov', tmp, first))
+            result.append(("mov", tmp, first))
             for reg in order:
-                result.append(('mov', reg, in_out[reg]))
+                result.append(("mov", reg, in_out[reg]))
 
     else:
         for cycle in cycles:
             size = len(cycle)
             if size == 1:
                 [reg] = cycle
-                result.append(('mov', reg, in_out[reg]))
-            for i in range(size-1):
-                result.append(('xchg', cycle[i], cycle[(i+1) % size]))
+                result.append(("mov", reg, in_out[reg]))
+            for i in range(size - 1):
+                result.append(("xchg", cycle[i], cycle[(i + 1) % size]))
 
     # Finally, set the temp register's final value
     if tmp and tmp in in_out:
-        result.append(('mov', tmp, in_out[tmp]))
+        result.append(("mov", tmp, in_out[tmp]))
 
     for dreg, sreg in sorted(post_mov.items()):
-        result.append(('mov', dreg, sreg))
+        result.append(("mov", dreg, sreg))
 
     return result

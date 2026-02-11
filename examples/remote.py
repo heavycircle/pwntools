@@ -1,11 +1,12 @@
 """
 Example showing how to use the remote class.
 """
+from __future__ import annotations
 
 from pwn import *
 
-sock = remote('127.0.0.1', 9001)
+sock = remote("127.0.0.1", 9001)
 
 print(sock.recvline())
-sock.send('foo')
+sock.send("foo")
 sock.interactive()

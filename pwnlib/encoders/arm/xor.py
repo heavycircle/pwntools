@@ -1,12 +1,9 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 from pwnlib import shellcraft
 from pwnlib.asm import asm
-from pwnlib.context import context
 from pwnlib.encoders.encoder import Encoder
 from pwnlib.util.fiddling import xor_key
-from pwnlib.util.lists import group
 from pwnlib.util.packing import u8
 
 
@@ -24,7 +21,7 @@ class ArmXorEncoder(Encoder):
     b'hello\n'
     """
 
-    arch = 'arm'
+    arch = "arm"
 
     decoder = """
     adr r8, payload
@@ -45,15 +42,18 @@ xor_cacheflush:
 payload:
     """
 
-    blacklist = set("\x01\x80\x03\x85\x04\x07\x87\x0c\x8f\x0f\x16\x1c\x9f\x84\xa0%$'-/\xb0\xbd\x81A@\xc2DG\xc6\xc8OPT\xd8_\xe1`\xe3\xe2\xe5\xe7\xe9\xe8\xea\xe0p\xf7")
+    blacklist = set(
+        "\x01\x80\x03\x85\x04\x07\x87\x0c\x8f\x0f\x16\x1c\x9f\x84\xa0%$'-/\xb0\xbd\x81A@\xc2DG\xc6\xc8OPT\xd8_\xe1`\xe3\xe2\xe5\xe7\xe9\xe8\xea\xe0p\xf7"
+    )
 
-    def __call__(self, raw_bytes, avoid, pcreg=''):
+    def __call__(self, raw_bytes, avoid, pcreg=""):
         key, xordata = xor_key(raw_bytes, avoid, size=1)
-        key          = u8(key)
-        maximum      = 256
-        length       = len(raw_bytes)
-        cacheflush   = shellcraft.arm.linux.cacheflush()
-        decoder      = asm(self.decoder % locals())
+        key = u8(key)
+        maximum = 256
+        length = len(raw_bytes)
+        cacheflush = shellcraft.arm.linux.cacheflush()
+        decoder = asm(self.decoder % locals())
         return decoder + xordata
+
 
 encode = ArmXorEncoder()

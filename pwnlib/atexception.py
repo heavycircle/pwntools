@@ -2,8 +2,8 @@
 Analogous to atexit, this module allows the programmer to register functions to
 be run if an unhandled exception occurs.
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import sys
 import threading
@@ -11,11 +11,12 @@ import traceback
 
 from pwnlib.context import context
 
-__all__ = ['register', 'unregister']
+__all__ = ["register", "unregister"]
 
 _lock = threading.Lock()
 _ident = 0
 _handlers = {}
+
 
 def register(func, *args, **kwargs):
     """register(func, *args, **kwargs)
@@ -55,6 +56,7 @@ def register(func, *args, **kwargs):
     _handlers[ident] = (func, args, kwargs, vars(context))
     return ident
 
+
 def unregister(func):
     """unregister(func)
 
@@ -63,6 +65,7 @@ def unregister(func):
     """
     if func in _handlers:
         del _handlers[func]
+
 
 def _run_handlers():
     """_run_handlers()
@@ -73,8 +76,7 @@ def _run_handlers():
     If a handler raises an exception, it will be printed but nothing else
     happens, i.e. other handlers will be run.
     """
-    for _ident, (func, args, kwargs, ctx) in \
-        sorted(_handlers.items(), reverse = True):
+    for _ident, (func, args, kwargs, ctx) in sorted(_handlers.items(), reverse=True):
         try:
             with context.local():
                 context.clear()
@@ -88,8 +90,10 @@ def _run_handlers():
             typ, val, tb = sys.exc_info()
             traceback.print_exception(typ, val, tb.tb_next)
 
+
 # we rely on the existing excepthook to print exceptions
-_oldhook = getattr(sys, 'excepthook', None)
+_oldhook = getattr(sys, "excepthook", None)
+
 
 def _newhook(typ, val, tb):
     """_newhook(typ, val, tb)
@@ -101,5 +105,6 @@ def _newhook(typ, val, tb):
         _oldhook(typ, val, tb)
     if _run_handlers:
         _run_handlers()
+
 
 sys.excepthook = _newhook

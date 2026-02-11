@@ -1,17 +1,16 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import errno
 import socket
-import threading
+from queue import Queue
 
 from pwnlib.context import context
 from pwnlib.log import getLogger
-from pwnlib.tubes.sock import sock
 from pwnlib.tubes.remote import remote
-from queue import Queue
+from pwnlib.tubes.sock import sock
 
 log = getLogger(__name__)
+
 
 class server(sock):
     r"""Creates an TCP or UDP-server to listen for connections. It supports
@@ -68,8 +67,7 @@ class server(sock):
 
     _accepter = None
 
-    def __init__(self, port=0, bindaddr = "::", fam = "any", typ = "tcp",
-                 callback = None, blocking = False, *args, **kwargs):
+    def __init__(self, port=0, bindaddr="::", fam="any", typ="tcp", callback=None, blocking=False, *args, **kwargs):
         super(server, self).__init__(*args, **kwargs)
 
         port = int(port)
@@ -77,10 +75,10 @@ class server(sock):
         fam = self._get_family(fam)
         typ = self._get_type(typ)
 
-        if fam == socket.AF_INET and bindaddr == '::':
-            bindaddr = '0.0.0.0'
+        if fam == socket.AF_INET and bindaddr == "::":
+            bindaddr = "0.0.0.0"
 
-        h = self.waitfor('Trying to bind to %s on port %d' % (bindaddr, port))
+        h = self.waitfor("Trying to bind to %s on port %d" % (bindaddr, port))
 
         for res in socket.getaddrinfo(bindaddr, port, fam, typ, 0, socket.AI_PASSIVE):
             self.family, self.type, self.proto, self.canonname, self.sockaddr = res
@@ -104,9 +102,10 @@ class server(sock):
 
         self.sock = listen_sock
         self.connections = Queue()
+
         def accepter():
             while True:
-                h = self.waitfor('Waiting for connections on %s:%s' % (self.lhost, self.lport))
+                h = self.waitfor("Waiting for connections on %s:%s" % (self.lhost, self.lport))
                 while True:
                     try:
                         if self.type == socket.SOCK_STREAM:
@@ -118,7 +117,7 @@ class server(sock):
                             self.unrecv(data)
                         sock.settimeout(self.timeout)
                         break
-                    except socket.error as e:
+                    except OSError as e:
                         if e.errno == errno.EINTR:
                             continue
                         h.failure()
@@ -127,11 +126,11 @@ class server(sock):
                         return
 
                 self.rhost, self.rport = rhost[:2]
-                r = remote(self.rhost, self.rport, sock = sock, level = self.level)
-                h.success('Got connection from %s on port %d' % (self.rhost, self.rport))
+                r = remote(self.rhost, self.rport, sock=sock, level=self.level)
+                h.success("Got connection from %s on port %d" % (self.rhost, self.rport))
                 if callback:
                     if not blocking:
-                        t = context.Thread(target = callback, args = (r,))
+                        t = context.Thread(target=callback, args=(r,))
                         t.daemon = True
                         t.start()
                     else:
@@ -139,7 +138,7 @@ class server(sock):
                 else:
                     self.connections.put(r)
 
-        self._accepter = context.Thread(target = accepter)
+        self._accepter = context.Thread(target=accepter)
         self._accepter.daemon = True
         self._accepter.start()
 

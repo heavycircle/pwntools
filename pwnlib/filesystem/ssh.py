@@ -1,19 +1,16 @@
-# -*- coding: utf-8 -*-
 """
 Handles file abstraction for remote SSH files
 
 Emulates pathlib as much as possible, but does so through duck typing.
 """
+from __future__ import annotations
+
 import os
-import sys
-import tempfile
-import time
+from pathlib import *
 
 from pwnlib.context import context
-from pwnlib.util.misc import read, write
-from pwnlib.util.packing import _encode, _decode
+from pwnlib.util.packing import _decode, _encode
 
-from pathlib import *
 
 class SSHPath(PosixPath):
     r"""Represents a file that exists on a remote filesystem.
@@ -29,7 +26,7 @@ class SSHPath(PosixPath):
     Note:
 
         You can avoid having to supply ``ssh=`` on every ``SSHPath`` by setting
-        :data:`.context.ssh_session`.  
+        :data:`.context.ssh_session`.
         In these examples we provide ``ssh=`` for clarity.
 
     Examples:
@@ -39,7 +36,7 @@ class SSHPath(PosixPath):
         >>> ssh_conn = ssh('travis', 'example.pwnme')
 
         Let's use a temporary directory for our tests
-    
+
         >>> _ = ssh_conn.set_working_directory()
 
         Next, you can create SSHPath objects to represent the paths to files
@@ -63,14 +60,14 @@ class SSHPath(PosixPath):
         SSHPath('...', ssh=ssh(user='travis', host='127.0.0.1'))
     """
 
-    sep = '/'
+    sep = "/"
 
     def __init__(self, path, ssh=None):
         self.path = self._s(path)
         self.ssh = ssh or context.ssh_session
 
         if self.ssh is None:
-            raise ValueError('SSHPath requires an ssh session.  Provide onee or set context.ssh_session.')
+            raise ValueError("SSHPath requires an ssh session.  Provide onee or set context.ssh_session.")
 
     def _s(self, other):
         # We want strings
@@ -81,7 +78,7 @@ class SSHPath(PosixPath):
         return _decode(other)
 
     def _new(self, path, *a, **kw):
-        kw['ssh'] = self.ssh
+        kw["ssh"] = self.ssh
         path = self._s(path)
         return SSHPath(path, *a, **kw)
 
@@ -89,7 +86,7 @@ class SSHPath(PosixPath):
         with context.silent:
             return self.ssh.run(*a, **kw)
 
-#---------------------------------- PUREPATH ----------------------------------
+    # ---------------------------------- PUREPATH ----------------------------------
     def __str__(self):
         return self.path
 
@@ -103,7 +100,7 @@ class SSHPath(PosixPath):
         return os.fsencode(self)
 
     def __repr__(self):
-        return "{}({!r}, ssh={!r})".format(self.__class__.__name__, self.as_posix(), self.ssh)
+        return f"{self.__class__.__name__}({self.as_posix()!r}, ssh={self.ssh!r})"
 
     def as_uri(self):
         raise NotImplementedError()
@@ -120,11 +117,25 @@ class SSHPath(PosixPath):
 
         return True
 
-    def __hash__(*a, **kw): ""; raise NotImplementedError
-    def __lt__(*a, **kw): ""; raise NotImplementedError
-    def __le__(*a, **kw): ""; raise NotImplementedError
-    def __gt__(*a, **kw): ""; raise NotImplementedError
-    def __ge__(*a, **kw): ""; raise NotImplementedError
+    def __hash__(*a, **kw):
+        ""
+        raise NotImplementedError
+
+    def __lt__(*a, **kw):
+        ""
+        raise NotImplementedError
+
+    def __le__(*a, **kw):
+        ""
+        raise NotImplementedError
+
+    def __gt__(*a, **kw):
+        ""
+        raise NotImplementedError
+
+    def __ge__(*a, **kw):
+        ""
+        raise NotImplementedError
 
     @property
     def anchor(self):
@@ -148,9 +159,9 @@ class SSHPath(PosixPath):
         >>> f.suffix
         '.gz'
         """
-        if '.' not in self.name:
-            return ''
-        return self.name[self.name.rindex('.'):]
+        if "." not in self.name:
+            return ""
+        return self.name[self.name.rindex(".") :]
 
     @property
     def suffixes(self):
@@ -162,21 +173,21 @@ class SSHPath(PosixPath):
         """
 
         basename = self.name
-        if '.' not in basename:
-            return ''
-        return '.' + self.name.split('.', 1)[1]
+        if "." not in basename:
+            return ""
+        return "." + self.name.split(".", 1)[1]
 
     @property
     def stem(self):
         """Returns the stem of a file without any extension
-        
+
         >>> f = SSHPath('hello.tar.gz', ssh=ssh_conn)
         >>> f.stem
         'hello'
         """
-        if '.' not in self.name:
+        if "." not in self.name:
             return self.name
-        return self.name[:self.name.index('.')]
+        return self.name[: self.name.index(".")]
 
     def with_name(self, name):
         """Return a new path with the file name changed
@@ -187,7 +198,7 @@ class SSHPath(PosixPath):
         >>> f.with_name('asdf').path
         'hello/asdf'
         """
-        if '/' not in self.path:
+        if "/" not in self.path:
             return name
 
         path, _ = self.path.split(self.sep, 1)
@@ -216,12 +227,12 @@ class SSHPath(PosixPath):
         raise NotImplementedError()
 
     def is_relative_to(self, *other):
-        raise NotImplementedError()       
+        raise NotImplementedError()
 
     @property
     def parts(self):
         """Return the individual parts of the path
-    
+
         >>> f = SSHPath('hello/world.tar.gz', ssh=ssh_conn)
         >>> f.parts
         ['hello', 'world.tar.gz']
@@ -237,7 +248,7 @@ class SSHPath(PosixPath):
         """
         newpath = os.path.join(self.path, *args)
         return SSHPath(newpath, ssh=self.ssh)
-    
+
     # __truediv__
     # __rtruediv__
 
@@ -262,8 +273,8 @@ class SSHPath(PosixPath):
         >>> list(p.path for p in f.parents)
         ['hello', 'world']
         """
-        if '/' not in self.path:
-            return self._new('.')
+        if "/" not in self.path:
+            return self._new(".")
 
         return [self._new(p) for p in self.parent.path.split(self.sep)]
 
@@ -286,7 +297,7 @@ class SSHPath(PosixPath):
     def match(self, path_pattern):
         raise NotImplementedError()
 
-#------------------------------------ PATH ------------------------------------
+    # ------------------------------------ PATH ------------------------------------
 
     @property
     def cwd(self):
@@ -300,7 +311,7 @@ class SSHPath(PosixPath):
         >>> f.home # doctest: +ELLIPSIS
         SSHPath('/home/...', ssh=ssh(user='...', host='127.0.0.1'))
         """
-        path = self._run('echo ~').recvall().rstrip()
+        path = self._run("echo ~").recvall().rstrip()
         return self._new(path)
 
     def samefile(self, other_path):
@@ -349,7 +360,7 @@ class SSHPath(PosixPath):
         member :attr:`.ssh.cwd`.
 
         Example:
-            
+
             >>> f = SSHPath('absA/../absB/file', ssh=ssh_conn)
             >>> f.absolute().path # doctest: +ELLIPSIS
             '/.../absB/file'
@@ -392,7 +403,7 @@ class SSHPath(PosixPath):
 
         try:
             return self._new(self.ssh.sftp.normalize(path))
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             raise ValueError("Could not normalize path: %r" % path)
 
     def stat(self):
@@ -472,7 +483,7 @@ class SSHPath(PosixPath):
 
     def readlink(self):
         data = self.ssh.readlink(self.path)
-        if data == b'':
+        if data == b"":
             data = self.path
         return self._new(data)
 
@@ -486,7 +497,7 @@ class SSHPath(PosixPath):
         >>> f.exists()
         True
         """
-        self.ssh.write(self.path, b'')
+        self.ssh.write(self.path, b"")
         # self.ssh.sftp.truncate(self.path, 0)
 
     def mkdir(self, mode=0o777, parents=False, exist_ok=True):
@@ -512,18 +523,18 @@ class SSHPath(PosixPath):
         if not self.is_absolute():
             path = self._new(self.ssh.cwd)
         else:
-            path = self._new('/')
+            path = self._new("/")
 
         parts = self.path.split(self.sep)
 
         for part in parts:
             # Catch against common case, need to normalize path
-            if part == '..':
+            if part == "..":
                 raise ValueError("Cannot create directory '..'")
 
             path = path.joinpath(part)
 
-            # Don't create directories that already exist            
+            # Don't create directories that already exist
             try:
                 path.mkdir(mode=mode)
             except OSError:
@@ -575,7 +586,7 @@ class SSHPath(PosixPath):
         """
         try:
             self.ssh.sftp.remove(str(self))
-        except (IOError, OSError) as e:
+        except OSError as e:
             if self.exists() and not self.is_file():
                 raise ValueError("Cannot unlink %r: is not a file" % self)
             if not missing_ok:
@@ -683,12 +694,12 @@ class SSHPath(PosixPath):
         try:
             self.stat()
             return True
-        except IOError:
+        except OSError:
             return False
 
     def is_dir(self):
         """Returns True if the path exists and is a directory
-        
+
         Example:
 
             >>> f = SSHPath('is_dir', ssh=ssh_conn)
@@ -712,7 +723,7 @@ class SSHPath(PosixPath):
 
     def is_file(self):
         """Returns True if the path exists and is a file
-        
+
         Example:
 
             >>> f = SSHPath('is_file', ssh=ssh_conn)
@@ -760,14 +771,14 @@ class SSHPath(PosixPath):
             >>> f.expanduser().path # doctest: +ELLIPSIS
             '/home/.../my-file'
         """
-        if not self.path.startswith('~/'):
+        if not self.path.startswith("~/"):
             return self
-        
+
         home = self.home
-        subpath = self.path.replace('~/', '')
+        subpath = self.path.replace("~/", "")
         return home.joinpath(subpath)
 
-#----------------------------- PWNTOOLS ADDITIONS -----------------------------
+    # ----------------------------- PWNTOOLS ADDITIONS -----------------------------
     @classmethod
     def mktemp(cls):
         temp = _decode(context.ssh_session.mktemp())
@@ -778,4 +789,5 @@ class SSHPath(PosixPath):
         temp = _decode(context.ssh_session.mkdtemp())
         return SSHPath(temp, ssh=context.ssh_session)
 
-__all__ = ['SSHPath']
+
+__all__ = ["SSHPath"]

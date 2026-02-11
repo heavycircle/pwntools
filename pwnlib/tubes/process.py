@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import ctypes
 import errno
@@ -14,7 +12,7 @@ import sys
 import time
 from collections import namedtuple
 
-IS_WINDOWS = sys.platform.startswith('win')
+IS_WINDOWS = sys.platform.startswith("win")
 
 if IS_WINDOWS:
     import queue
@@ -31,19 +29,22 @@ from pwnlib.log import getLogger
 from pwnlib.timeout import Timeout
 from pwnlib.tubes.tube import tube
 from pwnlib.util.hashes import sha256file
-from pwnlib.util.misc import parse_ldd_output
-from pwnlib.util.misc import which
-from pwnlib.util.misc import normalize_argv_env
+from pwnlib.util.misc import normalize_argv_env, which
 from pwnlib.util.packing import _decode
 
 log = getLogger(__name__)
 
-class PTY(object): pass
-PTY=PTY()
+
+class PTY:
+    pass
+
+
+PTY = PTY()
 STDOUT = subprocess.STDOUT
 PIPE = subprocess.PIPE
 
-signal_names = {-v:k for k,v in signal.__dict__.items() if k.startswith('SIG')}
+signal_names = {-v: k for k, v in signal.__dict__.items() if k.startswith("SIG")}
+
 
 class process(tube):
     r"""
@@ -235,36 +236,38 @@ class process(tube):
 
     proc = None
 
-    def __init__(self, argv = None,
-                 shell = False,
-                 executable = None,
-                 cwd = None,
-                 env = None,
-                 ignore_environ = None,
-                 stdin  = PIPE,
-                 stdout = PTY if not IS_WINDOWS else PIPE,
-                 stderr = STDOUT,
-                 close_fds = True,
-                 preexec_fn = lambda: None,
-                 preexec_args = (),
-                 raw = True,
-                 aslr = None,
-                 setuid = None,
-                 where = 'local',
-                 display = None,
-                 alarm = None,
-                 creationflags = 0,
-                 *args,
-                 **kwargs
-                 ):
-        super(process, self).__init__(*args,**kwargs)
+    def __init__(
+        self,
+        argv=None,
+        shell=False,
+        executable=None,
+        cwd=None,
+        env=None,
+        ignore_environ=None,
+        stdin=PIPE,
+        stdout=PTY if not IS_WINDOWS else PIPE,
+        stderr=STDOUT,
+        close_fds=True,
+        preexec_fn=lambda: None,
+        preexec_args=(),
+        raw=True,
+        aslr=None,
+        setuid=None,
+        where="local",
+        display=None,
+        alarm=None,
+        creationflags=0,
+        *args,
+        **kwargs,
+    ):
+        super(process, self).__init__(*args, **kwargs)
 
         # Permit using context.binary
         if argv is None:
             if context.binary:
                 argv = [context.binary.path]
             else:
-                raise TypeError('Must provide argv or set context.binary')
+                raise TypeError("Must provide argv or set context.binary")
 
         if IS_WINDOWS and PTY in (stdin, stdout, stderr):
             raise NotImplementedError("ConPTY isn't implemented yet")
@@ -279,9 +282,9 @@ class process(tube):
             executable_val, argv_val, env_val = executable, argv, env
             if executable is None:
                 if IS_WINDOWS:
-                    executable_val = os.environ.get('ComSpec', 'cmd.exe')
+                    executable_val = os.environ.get("ComSpec", "cmd.exe")
                 else:
-                    executable_val = '/bin/sh'
+                    executable_val = "/bin/sh"
         else:
             executable_val, argv_val, env_val = self._validate(cwd, executable, argv, env)
 
@@ -302,16 +305,16 @@ class process(tube):
             handles = (stdin, stdout, stderr)
 
             #: Which file descriptor is the controlling TTY
-            self.pty          = handles.index(PTY) if PTY in handles else None
+            self.pty = handles.index(PTY) if PTY in handles else None
 
             #: Whether the controlling TTY is set to raw mode
-            self.raw          = raw
+            self.raw = raw
 
             #: Whether ASLR should be left on
-            self.aslr         = aslr if aslr is not None else context.aslr
+            self.aslr = aslr if aslr is not None else context.aslr
 
             #: Whether setuid is permitted
-            self._setuid      = setuid if setuid is None else bool(setuid)
+            self._setuid = setuid if setuid is None else bool(setuid)
 
             # Create the PTY if necessary
             stdin, stdout, stderr, master, slave = self._handles(*handles)
@@ -336,22 +339,23 @@ class process(tube):
         self._cwd = os.path.realpath(cwd or os.path.curdir)
 
         #: Alarm timeout of the process
-        self.alarm        = alarm
+        self.alarm = alarm
 
         self.preexec_fn = preexec_fn
         self.preexec_args = preexec_args
-        self.display    = display or self.program
-        self._qemu      = False
-        self._corefile  = None
+        self.display = display or self.program
+        self._qemu = False
+        self._corefile = None
 
         message = "Starting %s process %r" % (where, self.display)
 
         if self.isEnabledFor(logging.DEBUG):
-            if argv != [self.executable]: message += ' argv=%r ' % self.argv
-            if original_env not in (os.environ, None):  message += ' env=%r ' % self.env
+            if argv != [self.executable]:
+                message += " argv=%r " % self.argv
+            if original_env not in (os.environ, None):
+                message += " env=%r " % self.env
 
         with self.progress(message) as p:
-
             if not self.aslr:
                 self.warn_once("ASLR is disabled!")
 
@@ -367,26 +371,28 @@ class process(tube):
                     args = self.argv
                     if prefix:
                         args = prefix + args
-                    self.proc = subprocess.Popen(args = args,
-                                                 shell = shell,
-                                                 executable = executable,
-                                                 cwd = cwd,
-                                                 env = self.env,
-                                                 stdin = stdin,
-                                                 stdout = stdout,
-                                                 stderr = stderr,
-                                                 close_fds = close_fds,
-                                                 preexec_fn = internal_preexec_fn,
-                                                 creationflags = creationflags)
+                    self.proc = subprocess.Popen(
+                        args=args,
+                        shell=shell,
+                        executable=executable,
+                        cwd=cwd,
+                        env=self.env,
+                        stdin=stdin,
+                        stdout=stdout,
+                        stderr=stderr,
+                        close_fds=close_fds,
+                        preexec_fn=internal_preexec_fn,
+                        creationflags=creationflags,
+                    )
                     break
                 except OSError as exception:
-                    if sys.platform == 'win32':
+                    if sys.platform == "win32":
                         raise
                     if exception.errno != errno.ENOEXEC:
                         raise
                     prefixes.append(self.__on_enoexec(exception))
 
-            p.success('pid %i' % self.pid)
+            p.success("pid %i" % self.pid)
 
         if IS_WINDOWS:
             self._read_thread = None
@@ -400,11 +406,11 @@ class process(tube):
 
         if self.pty is not None:
             if stdin is slave:
-                self.proc.stdin = os.fdopen(os.dup(master), 'r+b', 0)
+                self.proc.stdin = os.fdopen(os.dup(master), "r+b", 0)
             if stdout is slave:
-                self.proc.stdout = os.fdopen(os.dup(master), 'r+b', 0)
+                self.proc.stdout = os.fdopen(os.dup(master), "r+b", 0)
             if stderr is slave:
-                self.proc.stderr = os.fdopen(os.dup(master), 'r+b', 0)
+                self.proc.stderr = os.fdopen(os.dup(master), "r+b", 0)
 
             os.close(master)
             os.close(slave)
@@ -421,9 +427,9 @@ class process(tube):
         self.sgid = self.gid = os.getgid()
         st = os.stat(self.executable)
         if self._setuid:
-            if (st.st_mode & stat.S_ISUID):
+            if st.st_mode & stat.S_ISUID:
                 self.suid = st.st_uid
-            if (st.st_mode & stat.S_ISGID):
+            if st.st_mode & stat.S_ISGID:
                 self.sgid = st.st_gid
 
     def __preexec_fn(self):
@@ -438,9 +444,9 @@ class process(tube):
 
         if not self.aslr:
             try:
-                if context.os == 'linux' and self._setuid is not True:
+                if context.os == "linux" and self._setuid is not True:
                     ADDR_NO_RANDOMIZE = 0x0040000
-                    ctypes.CDLL('libc.so.6').personality(ADDR_NO_RANDOMIZE)
+                    ctypes.CDLL("libc.so.6").personality(ADDR_NO_RANDOMIZE)
 
                 resource.setrlimit(resource.RLIMIT_STACK, (-1, -1))
             except Exception:
@@ -457,26 +463,25 @@ class process(tube):
 
         # Given that we want a core file, assume that we want the whole thing.
         try:
-            with open('/proc/self/coredump_filter', 'w') as f:
-                f.write('0xff')
+            with open("/proc/self/coredump_filter", "w") as f:
+                f.write("0xff")
         except Exception:
             pass
 
         if self._setuid is False:
             try:
                 PR_SET_NO_NEW_PRIVS = 38
-                ctypes.CDLL('libc.so.6').prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)
+                ctypes.CDLL("libc.so.6").prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)
             except Exception:
                 pass
 
         # Avoid issues with attaching to processes when yama-ptrace is set
         try:
-            PR_SET_PTRACER = 0x59616d61
+            PR_SET_PTRACER = 0x59616D61
             PR_SET_PTRACER_ANY = -1
-            ctypes.CDLL('libc.so.6').prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0)
+            ctypes.CDLL("libc.so.6").prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0)
         except Exception:
             pass
-
 
         if self.alarm is not None:
             signal.alarm(self.alarm)
@@ -494,11 +499,12 @@ class process(tube):
         with context.quiet:
             # XXX: Cyclic imports :(
             from pwnlib.elf import ELF
+
             binary = ELF(self.executable)
 
         # If we're on macOS, this will never work.  Bail now.
         # if platform.mac_ver()[0]:
-            # self.error("Cannot run ELF binaries on macOS")
+        # self.error("Cannot run ELF binaries on macOS")
 
         # Determine what architecture the binary is, and find the
         # appropriate qemu binary to run it.
@@ -513,8 +519,8 @@ class process(tube):
 
             args = [qemu_path]
             if self.argv:
-                args += ['-0', self.argv[0]]
-            args += ['--']
+                args += ["-0", self.argv[0]]
+            args += ["--"]
 
             return [args, qemu_path]
 
@@ -555,12 +561,12 @@ class process(tube):
         """
         try:
             from pwnlib.util.proc import cwd
+
             self._cwd = cwd(self.pid)
         except Exception:
             pass
 
         return self._cwd
-
 
     def _validate(self, cwd, executable, argv, env):
         """
@@ -574,7 +580,7 @@ class process(tube):
 
         argv, env = normalize_argv_env(argv, env, self, 4)
         if env:
-            if sys.platform == 'win32':
+            if sys.platform == "win32":
                 # Windows requires that all environment variables be strings
                 env = {_decode(k): _decode(v) for k, v in env}
             else:
@@ -594,13 +600,13 @@ class process(tube):
             executable = argv[0]
 
         if not isinstance(executable, str):
-            executable = executable.decode('utf-8')
+            executable = executable.decode("utf-8")
 
-        path = env and env.get(b'PATH')
+        path = env and env.get(b"PATH")
         if path:
             path = path.decode()
         else:
-            path = os.environ.get('PATH')
+            path = os.environ.get("PATH")
         # Do not change absolute paths to binaries
         if executable.startswith(os.path.sep):
             pass
@@ -626,7 +632,7 @@ class process(tube):
             executable = os.path.join(orig_cwd, executable)
 
         if not os.path.exists(executable):
-            self.error("%r does not exist"  % executable)
+            self.error("%r does not exist" % executable)
         if not os.path.isfile(executable):
             self.error("%r is not a file" % executable)
         if not os.access(executable, os.X_OK):
@@ -669,7 +675,7 @@ class process(tube):
         """Permit pass-through access to the underlying process object for
         fields like ``pid`` and ``stdin``.
         """
-        if not attr.startswith('_') and hasattr(self.proc, attr):
+        if not attr.startswith("_") and hasattr(self.proc, attr):
             return getattr(self.proc, attr)
         raise AttributeError("'process' object has no attribute '%s'" % attr)
 
@@ -684,16 +690,16 @@ class process(tube):
         """terminate()
 
         Terminates the process by sending SIGTERM.
-        
+
         This is a more graceful way to stop a process compared to :meth:`kill`,
         which sends SIGKILL. The process has a chance to clean up and
         exit gracefully when receiving SIGTERM.
 
         The process can choose to ignore this signal, so proper cleanup
         is only done in :meth:`kill`/:meth:`close`.
-        
+
         Examples:
-        
+
             >>> p = process(['python', '-u', '-c', 'import signal;signal.signal(signal.SIGTERM, lambda signum,frame: (print("sigterm"),exit(0)));print("ready");import time;time.sleep(10)'])
             >>> p.recvline_contains(b'ready')
             b'ready'
@@ -704,7 +710,7 @@ class process(tube):
         """
         if self.proc is None:
             return
-            
+
         try:
             self.proc.terminate()
         except OSError:
@@ -714,7 +720,7 @@ class process(tube):
         # Check if process is still running.
         self.poll()
 
-    def poll(self, block = False):
+    def poll(self, block=False):
         """poll(block = False) -> int
 
         Arguments:
@@ -736,17 +742,14 @@ class process(tube):
 
         if returncode is not None and not self._stop_noticed:
             self._stop_noticed = time.time()
-            signame = ''
+            signame = ""
             if returncode < 0:
-                signame = ' (%s)' % (signal_names.get(returncode, 'SIG???'))
+                signame = " (%s)" % (signal_names.get(returncode, "SIG???"))
 
-            self.info("Process %r stopped with exit code %d%s (pid %i)" % (self.display,
-                                                                  returncode,
-                                                                  signame,
-                                                                  self.pid))
+            self.info("Process %r stopped with exit code %d%s (pid %i)" % (self.display, returncode, signame, self.pid))
         return returncode
 
-    def communicate(self, stdin = None):
+    def communicate(self, stdin=None):
         """communicate(stdin = None) -> str
 
         Calls :meth:`subprocess.Popen.communicate` method on the process.
@@ -760,14 +763,14 @@ class process(tube):
         # dead, so we can write a message.
         self.poll()
 
-        if not self.connected_raw('recv'):
+        if not self.connected_raw("recv"):
             raise EOFError
 
         if not self.can_recv_raw(self.timeout):
-            return ''
+            return ""
 
         if IS_WINDOWS:
-            data = b''
+            data = b""
             count = 0
             while count < numb:
                 if self._read_queue.empty():
@@ -780,11 +783,11 @@ class process(tube):
         # This will only be reached if we either have data,
         # or we have reached an EOF. In either case, it
         # should be safe to read without expecting it to block.
-        data = ''
+        data = ""
 
         try:
             data = self.proc.stdout.read(numb)
-        except IOError:
+        except OSError:
             pass
 
         if not data:
@@ -798,20 +801,20 @@ class process(tube):
         # dead, so we can write a message.
         self.poll()
 
-        if not self.connected_raw('send'):
+        if not self.connected_raw("send"):
             raise EOFError
 
         try:
             self.proc.stdin.write(data)
             self.proc.stdin.flush()
-        except IOError:
+        except OSError:
             raise EOFError
 
     def settimeout_raw(self, timeout):
         pass
 
     def can_recv_raw(self, timeout):
-        if not self.connected_raw('recv'):
+        if not self.connected_raw("recv"):
             return False
 
         if IS_WINDOWS:
@@ -837,16 +840,16 @@ class process(tube):
             #     return select.select([self.proc.stdout], [], [], timeout) == ([self.proc.stdout], [], [])
             # ValueError: I/O operation on closed file
             raise EOFError
-        except select.error as v:
+        except OSError as v:
             if v.args[0] == errno.EINTR:
                 return False
 
     def connected_raw(self, direction):
-        if direction == 'any':
+        if direction == "any":
             return self.poll() is None
-        elif direction == 'send':
+        elif direction == "send":
             return self.proc.stdin and not self.proc.stdin.closed
-        elif direction == 'recv':
+        elif direction == "recv":
             return self.proc.stdout and not self.proc.stdout.closed
 
     def close(self):
@@ -861,7 +864,7 @@ class process(tube):
                 self.proc.kill()
                 self.proc.wait()
                 self._stop_noticed = time.time()
-                self.info('Stopped process %r (pid %i)' % (self.program, self.pid))
+                self.info("Stopped process %r (pid %i)" % (self.program, self.pid))
             except OSError:
                 pass
 
@@ -870,10 +873,9 @@ class process(tube):
             if fd is not None:
                 try:
                     fd.close()
-                except IOError as e:
+                except OSError as e:
                     if e.errno != errno.EPIPE and e.errno != errno.EINVAL:
                         raise
-
 
     def fileno(self):
         if not self.connected():
@@ -892,9 +894,9 @@ class process(tube):
             self.close()
 
     def __pty_make_controlling_tty(self, tty_fd):
-        '''This makes the pseudo-terminal the controlling tty. This should be
+        """This makes the pseudo-terminal the controlling tty. This should be
         more portable than the pty.fork() function. Specifically, this should
-        work on Solaris. '''
+        work on Solaris."""
 
         child_name = os.ttyname(tty_fd)
 
@@ -916,8 +918,7 @@ class process(tube):
             fd = os.open("/dev/tty", os.O_RDWR | os.O_NOCTTY)
             if fd >= 0:
                 os.close(fd)
-                raise Exception('Failed to disconnect from '
-                    'controlling tty. It is still possible to open /dev/tty.')
+                raise Exception("Failed to disconnect from controlling tty. It is still possible to open /dev/tty.")
         # which exception, shouldnt' we catch explicitly .. ?
         except OSError:
             # Good! We are disconnected from a controlling tty.
@@ -941,7 +942,7 @@ class process(tube):
         """maps() -> [mapping]
 
         Returns a list of process mappings.
-        
+
         A mapping object has the following fields:
             addr, address (addr alias), start (addr alias), end, size, perms, path, rss, pss, shared_clean, shared_dirty, private_clean, private_dirty, referenced, anonymous, swap
 
@@ -949,7 +950,7 @@ class process(tube):
             read, write, execute, private, shared, string
 
         Example:
-      
+
             >>> p = process(['cat'])
             >>> p.sendline(b"meow")
             >>> p.recvline()
@@ -986,8 +987,8 @@ class process(tube):
             pmmap_ext = namedtuple(
                 'pmmap_ext', 'addr perms ' + ' '.join(pmmap_grouped._fields))
 
-            
-        Here is an example of a pmmap_ext entry: 
+
+        Here is an example of a pmmap_ext entry:
 
         .. code-block:: python
 
@@ -995,22 +996,42 @@ class process(tube):
         """
 
         permissions = namedtuple("permissions", "read write execute private shared string")
-        mapping = namedtuple("mapping", 
-            "addr address start end size perms path rss pss shared_clean shared_dirty private_clean private_dirty referenced anonymous swap")
+        mapping = namedtuple(
+            "mapping",
+            "addr address start end size perms path rss pss shared_clean shared_dirty private_clean private_dirty referenced anonymous swap",
+        )
         # addr = address (alias) = start (alias)
 
         from pwnlib.util.proc import memory_maps
+
         raw_maps = memory_maps(self.pid)
 
         maps = []
         # raw_mapping
         for r_m in raw_maps:
-            p_perms = permissions('r' in r_m.perms, 'w' in r_m.perms, 'x' in r_m.perms, 'p' in r_m.perms, 's' in r_m.perms, r_m.perms)
-            addr_split = r_m.addr.split('-')
+            p_perms = permissions(
+                "r" in r_m.perms, "w" in r_m.perms, "x" in r_m.perms, "p" in r_m.perms, "s" in r_m.perms, r_m.perms
+            )
+            addr_split = r_m.addr.split("-")
             p_addr = int(addr_split[0], 16)
-            p_mapping = mapping(p_addr, p_addr, p_addr, int(addr_split[1], 16), r_m.size, p_perms, r_m.path, r_m.rss,
-                                r_m.pss, r_m.shared_clean, r_m.shared_dirty, r_m.private_clean, r_m.private_dirty,
-                                r_m.referenced, r_m.anonymous, r_m.swap)
+            p_mapping = mapping(
+                p_addr,
+                p_addr,
+                p_addr,
+                int(addr_split[1], 16),
+                r_m.size,
+                p_perms,
+                r_m.path,
+                r_m.rss,
+                r_m.pss,
+                r_m.shared_clean,
+                r_m.shared_dirty,
+                r_m.private_clean,
+                r_m.private_dirty,
+                r_m.referenced,
+                r_m.anonymous,
+                r_m.swap,
+            )
             maps.append(p_mapping)
 
         return maps
@@ -1025,11 +1046,11 @@ class process(tube):
             single(bool=True): Whether to only return the first
                 mapping matched, or all of them.
 
-        Returns found mapping(s) in process memory according to 
+        Returns found mapping(s) in process memory according to
         path_value.
 
         Example:
-            
+
             >>> p = process(['cat'])
             >>> mapping = p.get_mapping('[stack]')
             >>> mapping.path == '[stack]'
@@ -1087,8 +1108,8 @@ class process(tube):
             1
 
         """
-        return self.get_mapping('[stack]', single)
-    
+        return self.get_mapping("[stack]", single)
+
     def heap_mapping(self, single=True):
         """heap_mapping(single=True) -> mapping
         heap_mapping(False) -> [mapping]
@@ -1119,8 +1140,8 @@ class process(tube):
             1
 
         """
-        return self.get_mapping('[heap]', single)
-    
+        return self.get_mapping("[heap]", single)
+
     def vdso_mapping(self, single=True):
         """vdso_mapping(single=True) -> mapping
         vdso_mapping(False) -> [mapping]
@@ -1148,8 +1169,8 @@ class process(tube):
             1
 
         """
-        return self.get_mapping('[vdso]', single)
-    
+        return self.get_mapping("[vdso]", single)
+
     def vvar_mapping(self, single=True):
         """vvar_mapping(single=True) -> mapping
         vvar_mapping(False) -> [mapping]
@@ -1177,8 +1198,8 @@ class process(tube):
             1
 
         """
-        return self.get_mapping('[vvar]', single)
-    
+        return self.get_mapping("[vvar]", single)
+
     def libc_mapping(self, single=True):
         """libc_mapping(single=True) -> mapping
         libc_mapping(False) -> [mapping]
@@ -1188,7 +1209,7 @@ class process(tube):
                 mapping matched, or all of them.
 
         Returns either the first libc mapping found in process memory,
-        or all libc mappings, depending on "single". 
+        or all libc mappings, depending on "single".
 
         Example:
 
@@ -1222,17 +1243,17 @@ class process(tube):
         if single:
             for mapping in all_maps:
                 lib_basename = os.path.basename(mapping.path)
-                if 'libc.so' in lib_basename or ('libc-' in lib_basename and '.so' in lib_basename):
+                if "libc.so" in lib_basename or ("libc-" in lib_basename and ".so" in lib_basename):
                     return mapping
             return None
 
         l_mappings = []
         for mapping in all_maps:
             lib_basename = os.path.basename(mapping.path)
-            if 'libc.so' in lib_basename or ('libc-' in lib_basename and '.so' in lib_basename):
+            if "libc.so" in lib_basename or ("libc-" in lib_basename and ".so" in lib_basename):
                 l_mappings.append(mapping)
         return l_mappings
-    
+
     def musl_mapping(self, single=True):
         """musl_mapping(single=True) -> mapping
         musl_mapping(False) -> [mapping]
@@ -1242,24 +1263,24 @@ class process(tube):
                 mapping matched, or all of them.
 
         Returns either the first musl mapping found in process memory,
-        or all musl mappings, depending on "single". 
+        or all musl mappings, depending on "single".
         """
         all_maps = self.maps()
 
         if single:
             for mapping in all_maps:
                 lib_basename = os.path.basename(mapping.path)
-                if 'musl.so' in lib_basename or ('musl-' in lib_basename and '.so' in lib_basename):
+                if "musl.so" in lib_basename or ("musl-" in lib_basename and ".so" in lib_basename):
                     return mapping
             return None
-        
+
         m_mappings = []
         for mapping in all_maps:
             lib_basename = os.path.basename(mapping.path)
-            if 'musl.so' in lib_basename or ('musl-' in lib_basename and '.so' in lib_basename):
+            if "musl.so" in lib_basename or ("musl-" in lib_basename and ".so" in lib_basename):
                 m_mappings.append(mapping)
         return m_mappings
-    
+
     def elf_mapping(self, single=True):
         """elf_mapping(single=True) -> mapping
         elf_mapping(False) -> [mapping]
@@ -1326,10 +1347,10 @@ class process(tube):
 
         # Expecting this to be sorted
         lib_mappings = self.get_mapping(path_value, single=False)
-        
+
         if len(lib_mappings) == 0:
             return 0
-    
+
         is_contiguous = True
         total_size = lib_mappings[0].size
         for i in range(1, len(lib_mappings)):
@@ -1345,7 +1366,7 @@ class process(tube):
 
     def address_mapping(self, address):
         """address_mapping(address) -> mapping
-        
+
         Returns the mapping at the specified address.
 
         Example:
@@ -1393,7 +1414,8 @@ class process(tube):
         libs = {}
         for mapping in maps_raw:
             path = mapping.path
-            if os.sep not in path: continue
+            if os.sep not in path:
+                continue
             path = os.path.realpath(path)
             if path not in libs:
                 libs[path] = mapping.addr
@@ -1425,7 +1447,7 @@ class process(tube):
 
         for lib, address in self.libs().items():
             lib_basename = os.path.basename(lib)
-            if 'libc.so' in lib_basename or ('libc-' in lib_basename and '.so' in lib_basename):
+            if "libc.so" in lib_basename or ("libc-" in lib_basename and ".so" in lib_basename):
                 e = ELF(lib)
                 e.address = address
                 return e
@@ -1437,6 +1459,7 @@ class process(tube):
         Returns an ELF file for the executable that launched the process.
         """
         import pwnlib.elf.elf
+
         return pwnlib.elf.elf.ELF(self.executable)
 
     @property
@@ -1461,7 +1484,7 @@ class process(tube):
                     self.error("Could not create corefile with GDB for %s", self.executable)
                 return corefile
 
-            if context.disable_corefiles :
+            if context.disable_corefiles:
                 self._corefile = None
                 return self._corefile
             # Handle race condition against the kernel or QEMU to write the corefile
@@ -1483,7 +1506,7 @@ class process(tube):
 
             self._corefile = pwnlib.elf.corefile.Corefile(finder.core_path)
         except AttributeError as e:
-            raise RuntimeError(e) # AttributeError would route through __getattr__, losing original message
+            raise RuntimeError(e)  # AttributeError would route through __getattr__, losing original message
         self._corefile._hash = core_hash
 
         return self._corefile
@@ -1513,10 +1536,10 @@ class process(tube):
             b'\x7fELF'
         """
         # If it's running under qemu-user, don't leak anything.
-        if 'qemu-' in os.path.realpath('/proc/%i/exe' % self.pid):
+        if "qemu-" in os.path.realpath("/proc/%i/exe" % self.pid):
             self.error("Cannot use leaker on binaries under QEMU.")
 
-        with open('/proc/%i/mem' % self.pid, 'rb') as mem:
+        with open("/proc/%i/mem" % self.pid, "rb") as mem:
             mem.seek(address)
             return mem.read(count) or None
 
@@ -1530,7 +1553,7 @@ class process(tube):
             data(bytes): Data to write to the address
 
         Example:
-        
+
             Let's write data to  the beginning of the mapped memory of the  ELF.
 
             >>> context.clear(arch='i386')
@@ -1558,13 +1581,12 @@ class process(tube):
             b'aaaabaaacaaadaaaeaaafaaagaaahaaa'
         """
 
-        if 'qemu-' in os.path.realpath('/proc/%i/exe' % self.pid):
+        if "qemu-" in os.path.realpath("/proc/%i/exe" % self.pid):
             self.error("Cannot use leaker on binaries under QEMU.")
 
-        with open('/proc/%i/mem' % self.pid, 'wb') as mem:
+        with open("/proc/%i/mem" % self.pid, "wb") as mem:
             mem.seek(address)
             return mem.write(data)
-
 
     @property
     def stdin(self):
@@ -1573,6 +1595,7 @@ class process(tube):
         See: :obj:`.process.proc`
         """
         return self.proc.stdin
+
     @property
     def stdout(self):
         """Shorthand for ``self.proc.stdout``
@@ -1580,6 +1603,7 @@ class process(tube):
         See: :obj:`.process.proc`
         """
         return self.proc.stdout
+
     @property
     def stderr(self):
         """Shorthand for ``self.proc.stderr``
@@ -1587,6 +1611,7 @@ class process(tube):
         See: :obj:`.process.proc`
         """
         return self.proc.stderr
+
 
 # Keep reading the process's output in a separate thread,
 # since there's no non-blocking read in python on Windows.

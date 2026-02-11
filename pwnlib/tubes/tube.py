@@ -1,27 +1,20 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import abc
 import logging
 import os
 import re
-import string
 import subprocess
 import sys
 import threading
 import time
 
-from pwnlib import atexit
-from pwnlib import term
+from pwnlib import atexit, term
 from pwnlib.context import context
 from pwnlib.log import Logger
 from pwnlib.timeout import Timeout
 from pwnlib.tubes.buffer import Buffer
-from pwnlib.util import fiddling
-from pwnlib.util import iters
-from pwnlib.util import misc
-from pwnlib.util import packing
+from pwnlib.util import fiddling, iters, misc, packing
 
 
 class tube(Timeout, Logger):
@@ -32,7 +25,7 @@ class tube(Timeout, Logger):
     default = Timeout.default
     forever = Timeout.forever
 
-    def __init__(self, timeout = default, level = None, *a, **kw):
+    def __init__(self, timeout=default, level=None, *a, **kw):
         super(tube, self).__init__(timeout)
 
         Logger.__init__(self, None)
@@ -44,7 +37,7 @@ class tube(Timeout, Logger):
         atexit.register(self.close)
 
     def _normalize_keepends_drop(self, keepends, drop, drop_default):
-        '''
+        """
         >>> t = tube()
         >>> t._normalize_keepends_drop(None, None, True)
         True
@@ -70,7 +63,7 @@ class tube(Timeout, Logger):
         Traceback (most recent call last):
             ...
         pwnlib.exception.PwnlibException: 'drop' and 'keepends' arguments cannot be used together.
-        '''
+        """
         if keepends is not None:
             self.warn_once("'keepends' argument is deprecated. Use 'drop' instead.")
         if drop is None and keepends is None:
@@ -83,22 +76,22 @@ class tube(Timeout, Logger):
 
     @property
     def newline(self):
-        r'''Character sent with methods like sendline() or used for recvline().
+        r"""Character sent with methods like sendline() or used for recvline().
 
-            >>> t = tube()
-            >>> t.newline = b'X'
-            >>> t.unrecv(b'A\nB\nCX')
-            >>> t.recvline()
-            b'A\nB\nCX'
+        >>> t = tube()
+        >>> t.newline = b'X'
+        >>> t.unrecv(b'A\nB\nCX')
+        >>> t.recvline()
+        b'A\nB\nCX'
 
-            >>> t = tube()
-            >>> context.newline = b'\r\n'
-            >>> t.newline
-            b'\r\n'
+        >>> t = tube()
+        >>> context.newline = b'\r\n'
+        >>> t.newline
+        b'\r\n'
 
-            # Clean up
-            >>> context.clear()
-        '''
+        # Clean up
+        >>> context.clear()
+        """
         if self._newline is not None:
             return self._newline
         return context.newline
@@ -108,7 +101,7 @@ class tube(Timeout, Logger):
         self._newline = packing._need_bytes(newline)
 
     # Functions based on functions from subclasses
-    def recv(self, numb = None, timeout = default):
+    def recv(self, numb=None, timeout=default):
         r"""recv(numb = 4096, timeout = default) -> bytes
 
         Receives up to `numb` bytes of data from the tube, and returns
@@ -140,7 +133,7 @@ class tube(Timeout, Logger):
                 b'Hello, world'
         """
         numb = self.buffer.get_fill_size(numb)
-        return self._recv(numb, timeout) or b''
+        return self._recv(numb, timeout) or b""
 
     def unrecv(self, data):
         """unrecv(data)
@@ -165,7 +158,7 @@ class tube(Timeout, Logger):
         data = packing._need_bytes(data)
         self.buffer.unget(data)
 
-    def _fillbuffer(self, timeout = default):
+    def _fillbuffer(self, timeout=default):
         """_fillbuffer(timeout = default)
 
         Fills the internal buffer from the pipe, by calling
@@ -186,21 +179,20 @@ class tube(Timeout, Logger):
             >>> len(t.buffer)
             3
         """
-        data = b''
+        data = b""
 
         with self.local(timeout):
             data = self.recv_raw(self.buffer.get_fill_size())
 
         if data and self.isEnabledFor(logging.DEBUG):
-            self.debug('Received %#x bytes:' % len(data))
+            self.debug("Received %#x bytes:" % len(data))
             self.maybe_hexdump(data, level=logging.DEBUG)
         if data:
             self.buffer.add(data)
 
         return data
 
-
-    def _recv(self, numb = None, timeout = default):
+    def _recv(self, numb=None, timeout=default):
         """_recv(numb = 4096, timeout = default) -> str
 
         Receives one chunk of from the internal buffer or from the OS if the
@@ -211,11 +203,11 @@ class tube(Timeout, Logger):
         # No buffered data, could not put anything in the buffer
         # before timeout.
         if not self.buffer and not self._fillbuffer(timeout):
-            return b''
+            return b""
 
         return self.buffer.get(numb)
 
-    def recvpred(self, pred, timeout = default):
+    def recvpred(self, pred, timeout=default):
         """recvpred(pred, timeout = default) -> bytes
 
         Receives one byte at a time from the tube, until ``pred(all_bytes)``
@@ -247,29 +239,29 @@ class tube(Timeout, Logger):
             b''
         """
 
-        data = b''
+        data = b""
 
         with self.countdown(timeout):
             while not pred(data):
                 if not self.countdown_active():
                     self.unrecv(data)
-                    return b''
+                    return b""
 
                 try:
                     res = self.recv(1, timeout=timeout)
                 except Exception:
                     self.unrecv(data)
-                    return b''
+                    return b""
 
                 if res:
                     data += res
                 else:
                     self.unrecv(data)
-                    return b''
+                    return b""
 
         return data
 
-    def recvn(self, numb, timeout = default):
+    def recvn(self, numb, timeout=default):
         """recvn(numb, timeout = default) -> bytes
 
         Receives exactly `n` bytes.
@@ -311,7 +303,7 @@ class tube(Timeout, Logger):
                 pass
 
         if len(self.buffer) < numb:
-            return b''
+            return b""
 
         return self.buffer.get(numb)
 
@@ -370,19 +362,19 @@ class tube(Timeout, Logger):
 
         # Cumulative data to search
         data = []
-        top = b''
+        top = b""
 
         with self.countdown(timeout):
             while self.countdown_active():
                 try:
                     res = self.recv(timeout=self.timeout)
                 except Exception:
-                    self.unrecv(b''.join(data) + top)
+                    self.unrecv(b"".join(data) + top)
                     raise
 
                 if not res:
-                    self.unrecv(b''.join(data) + top)
-                    return b''
+                    self.unrecv(b"".join(data) + top)
+                    return b""
 
                 top += res
                 start = len(top)
@@ -397,13 +389,13 @@ class tube(Timeout, Logger):
                         top = top[:start]
                     else:
                         top = top[:end]
-                    return b''.join(data) + top
+                    return b"".join(data) + top
                 if len(top) > longest:
                     i = -longest - 1
                     data.append(top[:i])
                     top = top[i:]
 
-        return b''
+        return b""
 
     def recvlines(self, numlines=2**20, keepends=None, drop=None, timeout=default):
         r"""recvlines(numlines, drop=True, timeout=default) -> list of bytes objects
@@ -454,7 +446,7 @@ class tube(Timeout, Logger):
                     # in the event of a timeout.
                     res = self.recvline(drop=False, timeout=timeout)
                 except Exception:
-                    self.unrecv(b''.join(lines))
+                    self.unrecv(b"".join(lines))
                     raise
 
                 if res:
@@ -573,7 +565,7 @@ class tube(Timeout, Logger):
         except EOFError:
             if not context.throw_eof_on_incomplete_line and self.buffer.size > 0:
                 if context.throw_eof_on_incomplete_line is None:
-                    self.warn_once('EOFError during recvline. Returning buffered data without trailing newline.')
+                    self.warn_once("EOFError during recvline. Returning buffered data without trailing newline.")
                 return self.buffer.get()
             raise
 
@@ -608,7 +600,7 @@ class tube(Timeout, Logger):
         del keepends
 
         tmpbuf = Buffer()
-        line   = b''
+        line = b""
         with self.countdown(timeout):
             while self.countdown_active():
                 try:
@@ -619,7 +611,7 @@ class tube(Timeout, Logger):
 
                 if not line:
                     self.buffer.unget(tmpbuf)
-                    return b''
+                    return b""
 
                 if pred(line):
                     if drop:
@@ -628,7 +620,7 @@ class tube(Timeout, Logger):
                 else:
                     tmpbuf.add(line)
 
-        return b''
+        return b""
 
     def recvline_contains(self, items, keepends=None, drop=None, timeout=default):
         r"""recvline_contains(items, drop=True, timeout=default) -> bytes
@@ -699,10 +691,9 @@ class tube(Timeout, Logger):
             delims = (delims,)
         delims = tuple(map(packing._need_bytes, delims))
 
-        return self.recvline_pred(lambda line: any(map(line.startswith, delims)),
-                                  keepends=keepends,
-                                  drop=drop,
-                                  timeout=timeout)
+        return self.recvline_pred(
+            lambda line: any(map(line.startswith, delims)), keepends=keepends, drop=drop, timeout=timeout
+        )
 
     def recvline_endswith(self, delims, keepends=None, drop=None, timeout=default):
         r"""recvline_endswith(delims, drop=True, timeout=default) -> bytes
@@ -732,10 +723,9 @@ class tube(Timeout, Logger):
 
         delims = tuple(packing._need_bytes(delim) + self.newline for delim in delims)
 
-        return self.recvline_pred(lambda line: any(map(line.endswith, delims)),
-                                  keepends=keepends,
-                                  drop=drop,
-                                  timeout=timeout)
+        return self.recvline_pred(
+            lambda line: any(map(line.endswith, delims)), keepends=keepends, drop=drop, timeout=timeout
+        )
 
     def recvregex(self, regex, exact=False, timeout=default, capture=False):
         r"""recvregex(regex, exact=False, timeout=default, capture=False) -> bytes
@@ -773,9 +763,9 @@ class tube(Timeout, Logger):
             pred = regex.search
 
         if capture:
-            return pred(self.recvpred(pred, timeout = timeout))
+            return pred(self.recvpred(pred, timeout=timeout))
         else:
-            return self.recvpred(pred, timeout = timeout)
+            return self.recvpred(pred, timeout=timeout)
 
     def recvline_regex(self, regex, exact=False, keepends=None, drop=None, timeout=default):
         """recvline_regex(regex, exact=False, drop=True, timeout=default) -> bytes
@@ -839,7 +829,7 @@ class tube(Timeout, Logger):
         Receives data until EOF is reached and closes the tube.
         """
 
-        with self.waitfor('Receiving all data') as h:
+        with self.waitfor("Receiving all data") as h:
             l = len(self.buffer)
             with self.local(timeout):
                 try:
@@ -878,12 +868,12 @@ class tube(Timeout, Logger):
         data = packing._need_bytes(data)
 
         if self.isEnabledFor(logging.DEBUG):
-            self.debug('Sent %#x bytes:' % len(data))
+            self.debug("Sent %#x bytes:" % len(data))
             self.maybe_hexdump(data, level=logging.DEBUG)
 
         self.send_raw(data)
 
-    def sendline(self, line=b''):
+    def sendline(self, line=b""):
         r"""sendline(data)
 
         Shorthand for ``t.send(data + t.newline)``.
@@ -909,7 +899,7 @@ class tube(Timeout, Logger):
             line = packing._need_bytes(line)
             self.sendline(line)
 
-    def sendafter(self, delim, data, timeout = default):
+    def sendafter(self, delim, data, timeout=default):
         """sendafter(delim, data, timeout = default) -> str
 
         A combination of ``recvuntil(delim, timeout=timeout)`` and ``send(data)``.
@@ -920,7 +910,7 @@ class tube(Timeout, Logger):
         self.send(data)
         return res
 
-    def sendlineafter(self, delim, data, timeout = default):
+    def sendlineafter(self, delim, data, timeout=default):
         """sendlineafter(delim, data, timeout = default) -> str
 
         A combination of ``recvuntil(delim, timeout=timeout)`` and ``sendline(data)``."""
@@ -930,7 +920,7 @@ class tube(Timeout, Logger):
         self.sendline(data)
         return res
 
-    def sendthen(self, delim, data, timeout = default):
+    def sendthen(self, delim, data, timeout=default):
         """sendthen(delim, data, timeout = default) -> str
 
         A combination of ``send(data)`` and ``recvuntil(delim, timeout=timeout)``."""
@@ -939,7 +929,7 @@ class tube(Timeout, Logger):
         self.send(data)
         return self.recvuntil(delim, timeout=timeout)
 
-    def sendlinethen(self, delim, data, timeout = default):
+    def sendlinethen(self, delim, data, timeout=default):
         """sendlinethen(delim, data, timeout = default) -> str
 
         A combination of ``sendline(data)`` and ``recvuntil(delim, timeout=timeout)``."""
@@ -948,7 +938,7 @@ class tube(Timeout, Logger):
         self.sendline(data)
         return self.recvuntil(delim, timeout=timeout)
 
-    def interactive(self, prompt = term.text.bold_red('$') + ' '):
+    def interactive(self, prompt=term.text.bold_red("$") + " "):
         """interactive(prompt = pwnlib.term.text.bold_red('$') + ' ')
 
         Does simultaneous reading and writing to the tube. In principle this just
@@ -959,48 +949,46 @@ class tube(Timeout, Logger):
         Thus it only works while in :data:`pwnlib.term.term_mode`.
         """
 
-        self.info('Switching to interactive mode')
+        self.info("Switching to interactive mode")
 
         go = threading.Event()
+
         def recv_thread():
             while not go.is_set():
                 try:
-                    cur = self.recv(timeout = 0.05)
-                    cur = cur.replace(self.newline, b'\n')
+                    cur = self.recv(timeout=0.05)
+                    cur = cur.replace(self.newline, b"\n")
                     if cur:
                         stdout = sys.stdout
                         if not term.term_mode:
-                            stdout = getattr(stdout, 'buffer', stdout)
+                            stdout = getattr(stdout, "buffer", stdout)
                         stdout.write(cur)
                         stdout.flush()
                 except EOFError:
-                    self.info('Got EOF while reading in interactive')
+                    self.info("Got EOF while reading in interactive")
                     break
 
-        t = context.Thread(target = recv_thread)
+        t = context.Thread(target=recv_thread)
         t.daemon = True
         t.start()
 
         from pwnlib.args import term_mode
+
         try:
             os_linesep = os.linesep.encode()
-            to_skip = b''
+            to_skip = b""
             while not go.is_set():
                 if term.term_mode:
-                    data = term.readline.readline(prompt = prompt, float = True)
-                    if data.endswith(b'\n') and self.newline != b'\n':
+                    data = term.readline.readline(prompt=prompt, float=True)
+                    if data.endswith(b"\n") and self.newline != b"\n":
                         data = data[:-1] + self.newline
                 else:
-                    stdin = getattr(sys.stdin, 'buffer', sys.stdin)
+                    stdin = getattr(sys.stdin, "buffer", sys.stdin)
                     data = stdin.read(1)
                     # Keep OS's line separator if NOTERM is set and
                     # the user did not specify a custom newline
                     # even if stdin is a tty.
-                    if sys.stdin.isatty() and (
-                        term_mode
-                        or context.newline != b"\n"
-                        or self._newline is not None
-                    ):
+                    if sys.stdin.isatty() and (term_mode or context.newline != b"\n" or self._newline is not None):
                         if to_skip:
                             if to_skip[:1] != data:
                                 data = os_linesep[: -len(to_skip)] + data
@@ -1025,15 +1013,15 @@ class tube(Timeout, Logger):
                         self.send(data)
                     except EOFError:
                         go.set()
-                        self.info('Got EOF while sending in interactive')
+                        self.info("Got EOF while sending in interactive")
                 else:
                     go.set()
         except KeyboardInterrupt:
-            self.info('Interrupted')
+            self.info("Interrupted")
             go.set()
 
         while t.is_alive():
-            t.join(timeout = 0.1)
+            t.join(timeout=0.1)
 
     def stream(self, line_mode=True):
         """stream()
@@ -1058,7 +1046,7 @@ class tube(Timeout, Logger):
                 buf.add(function())
                 stdout = sys.stdout
                 if not term.term_mode:
-                    stdout = getattr(stdout, 'buffer', stdout)
+                    stdout = getattr(stdout, "buffer", stdout)
                 stdout.write(buf.data[-1])
         except KeyboardInterrupt:
             pass
@@ -1067,7 +1055,7 @@ class tube(Timeout, Logger):
 
         return buf.get()
 
-    def clean(self, timeout = 0.05):
+    def clean(self, timeout=0.05):
         """clean(timeout = 0.05)
 
         Removes all the buffered data from a tube by calling
@@ -1096,7 +1084,7 @@ class tube(Timeout, Logger):
 
         return self.recvrepeat(timeout)
 
-    def clean_and_log(self, timeout = 0.05):
+    def clean_and_log(self, timeout=0.05):
         r"""clean_and_log(timeout = 0.05)
 
         Works exactly as :meth:`pwnlib.tubes.tube.tube.clean`, but logs received
@@ -1124,13 +1112,22 @@ class tube(Timeout, Logger):
         """
         cached_data = self.buffer.get()
         if cached_data and not self.isEnabledFor(logging.DEBUG):
-            with context.local(log_level='debug'):
-                self.debug('Received %#x bytes:' % len(cached_data))
+            with context.local(log_level="debug"):
+                self.debug("Received %#x bytes:" % len(cached_data))
                 self.maybe_hexdump(cached_data, level=logging.DEBUG)
-        with context.local(log_level='debug'):
+        with context.local(log_level="debug"):
             return cached_data + self.clean(timeout)
 
-    def upload_manually(self, data, target_path = './payload', prompt = b'$', chunk_size = 0x200, chmod_flags = 'u+x', compression='auto', end_marker = 'PWNTOOLS_DONE'):
+    def upload_manually(
+        self,
+        data,
+        target_path="./payload",
+        prompt=b"$",
+        chunk_size=0x200,
+        chmod_flags="u+x",
+        compression="auto",
+        end_marker="PWNTOOLS_DONE",
+    ):
         """upload_manually(data, target_path = './payload', prompt = b'$', chunk_size = 0x200, chmod_flags = 'u+x', compression='auto', end_marker = 'PWNTOOLS_DONE')
 
         Upload a file manually using base64 encoding and compression.
@@ -1158,7 +1155,7 @@ class tube(Timeout, Logger):
             prompt(bytes): The shell prompt to wait for.
             chunk_size(int): The size of each chunk to upload.
             chmod_flags(str): The flags to use with chmod. ``""`` to ignore.
-            compression(str): The compression to use. ``auto`` to automatically choose the best compression or ``gzip`` or ``xz``.	
+            compression(str): The compression to use. ``auto`` to automatically choose the best compression or ``gzip`` or ``xz``.
             end_marker(str): The marker to use to detect the end of the output. Only used when prompt is not set.
 
         Examples:
@@ -1189,43 +1186,47 @@ class tube(Timeout, Logger):
         """
         echo_end = ""
         if not prompt:
-            echo_end = "; echo {}".format(end_marker)
+            echo_end = f"; echo {end_marker}"
             end_markerb = end_marker.encode()
         else:
             end_markerb = prompt
 
         # Detect available compression utility, fallback to uncompressed upload.
         compression_mode = None
-        possible_compression = ['xz', 'gzip']
+        possible_compression = ["xz", "gzip"]
         if not prompt:
-            self.sendline("echo {}".format(end_marker).encode())
-        if compression == 'auto':
+            self.sendline(f"echo {end_marker}".encode())
+        if compression == "auto":
             for utility in possible_compression:
-                self.sendlineafter(end_markerb, "command -v {} && echo YEP || echo NOPE{}".format(utility, echo_end).encode())
-                result = self.recvuntil([b'YEP', b'NOPE'])
-                if b'YEP' in result:
+                self.sendlineafter(
+                    end_markerb, f"command -v {utility} && echo YEP || echo NOPE{echo_end}".encode()
+                )
+                result = self.recvuntil([b"YEP", b"NOPE"])
+                if b"YEP" in result:
                     compression_mode = utility
                     break
         elif compression in possible_compression:
             compression_mode = compression
         else:
-            self.error('Invalid compression mode: %s, has to be one of %s', compression, possible_compression)
+            self.error("Invalid compression mode: %s, has to be one of %s", compression, possible_compression)
 
-        self.debug('Manually uploading using compression mode: %s', compression_mode)
+        self.debug("Manually uploading using compression mode: %s", compression_mode)
 
-        compressed_data = b''
-        if compression_mode == 'xz':
+        compressed_data = b""
+        if compression_mode == "xz":
             import lzma
+
             compressed_data = lzma.compress(data, format=lzma.FORMAT_XZ, preset=9)
-            compressed_path = target_path + '.xz'
-        elif compression_mode == 'gzip':
+            compressed_path = target_path + ".xz"
+        elif compression_mode == "gzip":
             import gzip
             from io import BytesIO
+
             f = BytesIO()
-            with gzip.GzipFile(fileobj=f, mode='wb', compresslevel=9) as g:
+            with gzip.GzipFile(fileobj=f, mode="wb", compresslevel=9) as g:
                 g.write(data)
             compressed_data = f.getvalue()
-            compressed_path = target_path + '.gz'
+            compressed_path = target_path + ".gz"
         else:
             compressed_path = target_path
 
@@ -1237,24 +1238,34 @@ class tube(Timeout, Logger):
             data = compressed_data
 
         # Upload data in `chunk_size` chunks. Assume base64 is available.
-        with self.progress('Uploading payload') as p:
+        with self.progress("Uploading payload") as p:
             for idx, chunk in enumerate(iters.group(chunk_size, data)):
                 if None in chunk:
-                    chunk = chunk[:chunk.index(None)]
+                    chunk = chunk[: chunk.index(None)]
                 if idx == 0:
-                    self.sendlineafter(end_markerb, "echo {} | base64 -d > {}{}".format(fiddling.b64e(bytearray(chunk)), compressed_path, echo_end).encode())
+                    self.sendlineafter(
+                        end_markerb,
+                        f"echo {fiddling.b64e(bytearray(chunk))} | base64 -d > {compressed_path}{echo_end}".encode(),
+                    )
                 else:
-                    self.sendlineafter(end_markerb, "echo {} | base64 -d >> {}{}".format(fiddling.b64e(bytearray(chunk)), compressed_path, echo_end).encode())
-                p.status('{}/{} {}'.format(idx+1, len(data)//chunk_size+1, misc.size(idx*chunk_size + len(chunk))))
+                    self.sendlineafter(
+                        end_markerb,
+                        f"echo {fiddling.b64e(bytearray(chunk))} | base64 -d >> {compressed_path}{echo_end}".encode(),
+                    )
+                p.status(
+                    f"{idx + 1}/{len(data) // chunk_size + 1} {misc.size(idx * chunk_size + len(chunk))}"
+                )
             p.success(misc.size(len(data)))
 
         # Decompress the file and set the permissions.
         if compression_mode is not None:
-            self.sendlineafter(end_markerb, '{} -d -f {}{}'.format(compression_mode, compressed_path, echo_end).encode())
+            self.sendlineafter(
+                end_markerb, f"{compression_mode} -d -f {compressed_path}{echo_end}".encode()
+            )
         if chmod_flags:
-            self.sendlineafter(end_markerb, 'chmod {} {}{}'.format(chmod_flags, target_path, echo_end).encode())
+            self.sendlineafter(end_markerb, f"chmod {chmod_flags} {target_path}{echo_end}".encode())
         if not prompt:
-            self.recvuntil(end_markerb + b'\n')
+            self.recvuntil(end_markerb + b"\n")
 
     def connect_input(self, other):
         """connect_input(other)
@@ -1283,12 +1294,13 @@ class tube(Timeout, Logger):
 
         def pump():
             import sys as _sys
+
             while self.countdown_active():
-                if not (self.connected('send') and other.connected('recv')):
+                if not (self.connected("send") and other.connected("recv")):
                     break
 
                 try:
-                    data = other.recv(timeout = 0.05)
+                    data = other.recv(timeout=0.05)
                 except EOFError:
                     break
 
@@ -1306,10 +1318,10 @@ class tube(Timeout, Logger):
                 if not _sys:
                     return
 
-            self.shutdown('send')
-            other.shutdown('recv')
+            self.shutdown("send")
+            other.shutdown("recv")
 
-        t = context.Thread(target = pump)
+        t = context.Thread(target=pump)
         t.daemon = True
         t.start()
 
@@ -1351,13 +1363,7 @@ class tube(Timeout, Logger):
 
         Takes the same arguments as :class:`subprocess.Popen`."""
 
-        return subprocess.Popen(
-            *args,
-            stdin = self.fileno(),
-            stdout = self.fileno(),
-            stderr = self.fileno(),
-            **kwargs
-        )
+        return subprocess.Popen(*args, stdin=self.fileno(), stdout=self.fileno(), stderr=self.fileno(), **kwargs)
 
     def __lshift__(self, other):
         """
@@ -1414,7 +1420,7 @@ class tube(Timeout, Logger):
 
     wait = wait_for_close
 
-    def can_recv(self, timeout = 0):
+    def can_recv(self, timeout=0):
         """can_recv(timeout = 0) -> bool
 
         Returns True, if there is data available within `timeout` seconds.
@@ -1454,20 +1460,19 @@ class tube(Timeout, Logger):
 
         self.timeout = timeout
 
-
     shutdown_directions = {
-        'in':    'recv',
-        'read':  'recv',
-        'recv':  'recv',
-        'out':   'send',
-        'write': 'send',
-        'send':  'send',
+        "in": "recv",
+        "read": "recv",
+        "recv": "recv",
+        "out": "send",
+        "write": "send",
+        "send": "send",
     }
 
     connected_directions = shutdown_directions.copy()
-    connected_directions['any'] = 'any'
+    connected_directions["any"] = "any"
 
-    def shutdown(self, direction = "send"):
+    def shutdown(self, direction="send"):
         """shutdown(direction = "send")
 
         Closes the tube for futher reading or writing depending on `direction`.
@@ -1500,11 +1505,11 @@ class tube(Timeout, Logger):
         try:
             direction = self.shutdown_directions[direction]
         except KeyError:
-            raise KeyError('direction must be in %r' % sorted(self.shutdown_directions))
+            raise KeyError("direction must be in %r" % sorted(self.shutdown_directions))
         else:
             self.shutdown_raw(self.shutdown_directions[direction])
 
-    def connected(self, direction = 'any'):
+    def connected(self, direction="any"):
         """connected(direction = 'any') -> bool
 
         Returns True if the tube is connected in the specified direction.
@@ -1534,7 +1539,7 @@ class tube(Timeout, Logger):
         try:
             direction = self.connected_directions[direction]
         except KeyError:
-            raise KeyError('direction must be in %r' % sorted(self.connected_directions))
+            raise KeyError("direction must be in %r" % sorted(self.connected_directions))
         else:
             return self.connected_raw(direction)
 
@@ -1571,7 +1576,7 @@ class tube(Timeout, Logger):
         of a closed connection it should raise an ``exceptions.EOFError``.
         """
 
-        raise EOFError('Not implemented')
+        raise EOFError("Not implemented")
 
     @abc.abstractmethod
     def send_raw(self, data):
@@ -1583,7 +1588,7 @@ class tube(Timeout, Logger):
         more, because of a closed tube.
         """
 
-        raise EOFError('Not implemented')
+        raise EOFError("Not implemented")
 
     def settimeout_raw(self, timeout):
         """settimeout_raw(timeout)
@@ -1652,64 +1657,91 @@ class tube(Timeout, Logger):
 
         raise NotImplementedError()
 
+    def p64(self, *a, **kw):
+        return self.send(packing.p64(*a, **kw))
 
-    def p64(self, *a, **kw):        return self.send(packing.p64(*a, **kw))
-    def p32(self, *a, **kw):        return self.send(packing.p32(*a, **kw))
-    def p16(self, *a, **kw):        return self.send(packing.p16(*a, **kw))
-    def p8(self, *a, **kw):         return self.send(packing.p8(*a, **kw))
-    def pack(self, *a, **kw):       return self.send(packing.pack(*a, **kw))
+    def p32(self, *a, **kw):
+        return self.send(packing.p32(*a, **kw))
 
-    def u64(self, *a, **kw):        return packing.u64(self.recvn(8), *a, **kw)
-    def u32(self, *a, **kw):        return packing.u32(self.recvn(4), *a, **kw)
-    def u16(self, *a, **kw):        return packing.u16(self.recvn(2), *a, **kw)
-    def u8(self, *a, **kw):         return packing.u8(self.recvn(1), *a, **kw)
-    def unpack(self, *a, **kw):     return packing.unpack(self.recvn(context.bytes), *a, **kw)
+    def p16(self, *a, **kw):
+        return self.send(packing.p16(*a, **kw))
 
-    def flat(self, *a, **kw):       return self.send(packing.flat(*a,**kw))
-    def fit(self, *a, **kw):        return self.send(packing.fit(*a, **kw))
+    def p8(self, *a, **kw):
+        return self.send(packing.p8(*a, **kw))
+
+    def pack(self, *a, **kw):
+        return self.send(packing.pack(*a, **kw))
+
+    def u64(self, *a, **kw):
+        return packing.u64(self.recvn(8), *a, **kw)
+
+    def u32(self, *a, **kw):
+        return packing.u32(self.recvn(4), *a, **kw)
+
+    def u16(self, *a, **kw):
+        return packing.u16(self.recvn(2), *a, **kw)
+
+    def u8(self, *a, **kw):
+        return packing.u8(self.recvn(1), *a, **kw)
+
+    def unpack(self, *a, **kw):
+        return packing.unpack(self.recvn(context.bytes), *a, **kw)
+
+    def flat(self, *a, **kw):
+        return self.send(packing.flat(*a, **kw))
+
+    def fit(self, *a, **kw):
+        return self.send(packing.fit(*a, **kw))
 
     # Dynamic functions
 
     def make_wrapper(func):
         def wrapperb(self, *a, **kw):
             return bytearray(func(self, *a, **kw))
+
         def wrapperS(self, *a, **kw):
             return packing._decode(func(self, *a, **kw))
-        wrapperb.__doc__ = 'Same as :meth:`{func.__name__}`, but returns a bytearray'.format(func=func)
-        wrapperb.__name__ = func.__name__ + 'b'
-        wrapperS.__doc__ = 'Same as :meth:`{func.__name__}`, but returns a str, ' \
-                           'decoding the result using `context.encoding`. ' \
-                           '(note that the binary versions are way faster)'.format(func=func)
-        wrapperS.__name__ = func.__name__ + 'S'
+
+        wrapperb.__doc__ = f"Same as :meth:`{func.__name__}`, but returns a bytearray"
+        wrapperb.__name__ = func.__name__ + "b"
+        wrapperS.__doc__ = (
+            f"Same as :meth:`{func.__name__}`, but returns a str, "
+            "decoding the result using `context.encoding`. "
+            "(note that the binary versions are way faster)"
+        )
+        wrapperS.__name__ = func.__name__ + "S"
         return wrapperb, wrapperS
 
-    for func in [recv,
-                 recvn,
-                 recvall,
-                 recvrepeat,
-                 recvuntil,
-                 recvpred,
-                 recvregex,
-                 recvline,
-                 recvline_contains,
-                 recvline_startswith,
-                 recvline_endswith,
-                 recvline_regex]:
+    for func in [
+        recv,
+        recvn,
+        recvall,
+        recvrepeat,
+        recvuntil,
+        recvpred,
+        recvregex,
+        recvline,
+        recvline_contains,
+        recvline_startswith,
+        recvline_endswith,
+        recvline_regex,
+    ]:
         for wrapper in make_wrapper(func):
             locals()[wrapper.__name__] = wrapper
 
     def make_wrapper(func, alias):
         def wrapper(self, *a, **kw):
             return func(self, *a, **kw)
-        wrapper.__doc__ = 'Alias for :meth:`{func.__name__}`'.format(func=func)
+
+        wrapper.__doc__ = f"Alias for :meth:`{func.__name__}`"
         wrapper.__name__ = alias
         return wrapper
 
     for _name in list(locals()):
-        if 'recv' in _name:
-            _name2 = _name.replace('recv', 'read')
-        elif 'send' in _name:
-            _name2 = _name.replace('send', 'write')
+        if "recv" in _name:
+            _name2 = _name.replace("recv", "read")
+        elif "send" in _name:
+            _name2 = _name.replace("send", "write")
         else:
             continue
         locals()[_name2] = make_wrapper(locals()[_name], _name2)

@@ -47,25 +47,24 @@ Example
 
 DynELF
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import ctypes
 
 from elftools.elf.enums import ENUM_D_TAG
 
-from pwnlib import elf
-from pwnlib import libcdb
+from pwnlib import elf, libcdb
 from pwnlib.context import context
-from pwnlib.elf import ELF
-from pwnlib.elf import constants
+from pwnlib.elf import ELF, constants
 from pwnlib.log import getLogger
 from pwnlib.memleak import MemLeak
 from pwnlib.util.fiddling import enhex
 from pwnlib.util.packing import _need_bytes
 
-log    = getLogger(__name__)
+log = getLogger(__name__)
 sizeof = ctypes.sizeof
+
 
 def sysv_hash(symbol):
     """sysv_hash(str) -> int
@@ -76,10 +75,11 @@ def sysv_hash(symbol):
     g = 0
     for c in bytearray(_need_bytes(symbol, 4, 0x80)):
         h = (h << 4) + c
-        g = h & 0xf0000000
-        h ^= (g >> 24)
+        g = h & 0xF0000000
+        h ^= g >> 24
         h &= ~g
-    return h & 0xffffffff
+    return h & 0xFFFFFFFF
+
 
 def gnu_hash(s):
     """gnu_hash(str) -> int
@@ -90,10 +90,11 @@ def gnu_hash(s):
     h = 5381
     for c in s:
         h = h * 33 + c
-    return h & 0xffffffff
+    return h & 0xFFFFFFFF
 
-class DynELF(object):
-    '''
+
+class DynELF:
+    """
     DynELF knows how to resolve symbols in remote processes via an infoleak or
     memleak vulnerability encapsulated by :class:`pwnlib.memleak.MemLeak`.
 
@@ -144,10 +145,10 @@ class DynELF(object):
     .. _DT_DEBUG:  https://reverseengineering.stackexchange.com/questions/6525/elf-link-map-when-linked-as-relro
     .. _link map:  https://sourceware.org/git/?p=glibc.git;a=blob;f=elf/link.h;h=eaca8028e45a859ac280301a6e955a14eed1b887;hb=HEAD#l84
     .. _DT_PLTGOT: https://refspecs.linuxfoundation.org/ELF/zSeries/lzsabi0_zSeries/x2251.html
-    '''
+    """
 
     def __init__(self, leak, pointer=None, elf=None, libcdb=True):
-        '''
+        """
         Instantiates an object which can resolve symbols in a running binary
         given a :class:`pwnlib.memleak.MemLeak` leaker and a pointer inside
         the binary.
@@ -157,14 +158,14 @@ class DynELF(object):
             pointer(int):  A pointer into a loaded ELF file
             elf(str,ELF):  Path to the ELF file on disk, or a loaded :class:`pwnlib.elf.ELF`.
             libcdb(bool):  Attempt to use libcdb to speed up libc lookups
-        '''
-        self.libcdb    = libcdb
+        """
+        self.libcdb = libcdb
         self._elfclass = None
-        self._elftype  = None
+        self._elftype = None
         self._link_map = None
-        self._waitfor  = None
-        self._bases    = {}
-        self._dynamic  = None
+        self._waitfor = None
+        self._bases = {}
+        self._dynamic = None
         self.elf = None
 
         if elf:
@@ -173,7 +174,7 @@ class DynELF(object):
                 path = elf.path
 
             # Load a fresh copy of the ELF
-            with context.local(log_level='error'):
+            with context.local(log_level="error"):
                 w = self.waitfor("Loading from %r" % path)
                 self.elf = ELF(path)
                 w.success("[LOADED]")
@@ -189,15 +190,15 @@ class DynELF(object):
         if not elf:
             log.warn_once("No ELF provided.  Leaking is much faster if you have a copy of the ELF being leaked.")
 
-        self.leak    = leak
+        self.leak = leak
         self.libbase = self._find_base(pointer or elf.address)
 
         if elf:
             self._elftype = self.elf.elftype
             self._elfclass = self.elf.elfclass
             self.elf.address = self.libbase
-            self._dynamic = self.elf.get_section_by_name('.dynamic').header.sh_addr
-            self._dynamic = self._make_absolute_ptr(self._dynamic) 
+            self._dynamic = self.elf.get_section_by_name(".dynamic").header.sh_addr
+            self._dynamic = self._make_absolute_ptr(self._dynamic)
 
     @classmethod
     def for_one_lib_only(cls, leak, ptr):
@@ -219,8 +220,7 @@ class DynELF(object):
         """32 or 64"""
         if not self._elfclass:
             elfclass = self.leak.field(self.libbase, elf.Elf_eident.EI_CLASS)
-            self._elfclass =  {constants.ELFCLASS32: 32,
-                              constants.ELFCLASS64: 64}[elfclass]
+            self._elfclass = {constants.ELFCLASS32: 32, constants.ELFCLASS64: 64}[elfclass]
         return self._elfclass
 
     @property
@@ -230,13 +230,15 @@ class DynELF(object):
         ET_LOPROC and ET_HIPROC) or invalid, KeyError is raised.
         """
         if not self._elftype:
-            Ehdr  = {32: elf.Elf32_Ehdr, 64: elf.Elf64_Ehdr}[self.elfclass]
+            Ehdr = {32: elf.Elf32_Ehdr, 64: elf.Elf64_Ehdr}[self.elfclass]
             elftype = self.leak.field(self.libbase, Ehdr.e_type)
-            self._elftype = {constants.ET_NONE: 'NONE',
-                             constants.ET_REL: 'REL',
-                             constants.ET_EXEC: 'EXEC',
-                             constants.ET_DYN: 'DYN',
-                             constants.ET_CORE: 'CORE'}[elftype]
+            self._elftype = {
+                constants.ET_NONE: "NONE",
+                constants.ET_REL: "REL",
+                constants.ET_EXEC: "EXEC",
+                constants.ET_DYN: "DYN",
+                constants.ET_CORE: "CORE",
+            }[elftype]
         return self._elftype
 
     @property
@@ -264,7 +266,7 @@ class DynELF(object):
         w = None
 
         while True:
-            if self.leak.compare(ptr, b'\x7fELF'):
+            if self.leak.compare(ptr, b"\x7fELF"):
                 break
 
             # See if we can short circuit the search
@@ -281,11 +283,11 @@ class DynELF(object):
             # Defer creating the spinner in the event that 'ptr'
             # is already the base address
             w = w or self.waitfor("Finding base address")
-            self.status('%#x' % ptr)
+            self.status("%#x" % ptr)
 
         # If we created a spinner, print the success message
         if w:
-            self.success('%#x' % ptr)
+            self.success("%#x" % ptr)
 
         return ptr
 
@@ -310,7 +312,7 @@ class DynELF(object):
         candidate -= self.elf.address
 
         # The match should have the same page-alignment as our leaked data.
-        if candidate & 0xfff != 0x20:
+        if candidate & 0xFFF != 0x20:
             return None
 
         # Adjust based on the original pointer we got, and the ELF's address.
@@ -322,12 +324,12 @@ class DynELF(object):
         Returns the address of the first Program Header with the type
         PT_DYNAMIC.
         """
-        leak  = self.leak
-        base  = self.libbase
+        leak = self.leak
+        base = self.libbase
 
-        #First find PT_DYNAMIC
-        Ehdr  = {32: elf.Elf32_Ehdr, 64: elf.Elf64_Ehdr}[self.elfclass]
-        Phdr  = {32: elf.Elf32_Phdr, 64: elf.Elf64_Phdr}[self.elfclass]
+        # First find PT_DYNAMIC
+        Ehdr = {32: elf.Elf32_Ehdr, 64: elf.Elf64_Ehdr}[self.elfclass]
+        Phdr = {32: elf.Elf32_Phdr, 64: elf.Elf64_Phdr}[self.elfclass]
 
         self.status("PT_DYNAMIC")
 
@@ -372,7 +374,6 @@ class DynELF(object):
             return ptr
         return None
 
-
     def _find_dt(self, tag):
         """
         Find an entry in the DYNAMIC array.
@@ -383,17 +384,17 @@ class DynELF(object):
         Returns:
             Pointer to the data described by the specified entry.
         """
-        base    = self.libbase
+        base = self.libbase
         dynamic = self.dynamic
-        leak    = self.leak
-        name    = next(k for k,v in ENUM_D_TAG.items() if v == tag)
+        leak = self.leak
+        name = next(k for k, v in ENUM_D_TAG.items() if v == tag)
 
         # Read directly from the ELF if possible
         ptr = self._find_dt_optimized(name)
         if ptr:
             return ptr
 
-        Dyn = {32: elf.Elf32_Dyn,    64: elf.Elf64_Dyn}     [self.elfclass]
+        Dyn = {32: elf.Elf32_Dyn, 64: elf.Elf64_Dyn}[self.elfclass]
 
         # Found the _DYNAMIC program header, now find PLTGOT entry in it
         # An entry with a DT_NULL tag marks the end of the DYNAMIC array.
@@ -412,7 +413,6 @@ class DynELF(object):
 
         return ptr
 
-
     def _find_linkmap(self, pltgot=None, debug=None):
         """
         The linkmap is a chained structure created by the loader at runtime
@@ -427,7 +427,7 @@ class DynELF(object):
         """
         w = self.waitfor("Finding linkmap")
 
-        Got     = {32: elf.Elf_i386_GOT, 64: elf.Elf_x86_64_GOT}[self.elfclass]
+        Got = {32: elf.Elf_i386_GOT, 64: elf.Elf_x86_64_GOT}[self.elfclass]
         r_debug = {32: elf.Elf32_r_debug, 64: elf.Elf64_r_debug}[self.elfclass]
 
         linkmap = None
@@ -454,7 +454,7 @@ class DynELF(object):
 
         linkmap = self._make_absolute_ptr(linkmap)
 
-        w.success('%#x' % linkmap)
+        w.success("%#x" % linkmap)
         return linkmap
 
     def waitfor(self, msg):
@@ -494,9 +494,9 @@ class DynELF(object):
         Returns:
             An ELF object, or None.
         """
-        libc = b'libc.so'
+        libc = b"libc.so"
 
-        with self.waitfor('Downloading libc'):
+        with self.waitfor("Downloading libc"):
             dynlib = self._dynamic_load_dynelf(libc)
 
             self.status("Trying lookup based on Build ID")
@@ -515,7 +515,7 @@ class DynELF(object):
             libc.address = dynlib.libbase
             return libc
 
-    def lookup (self, symb = None, lib = None):
+    def lookup(self, symb=None, lib=None):
         """lookup(symb = None, lib = None) -> int
 
         Find the address of ``symbol``, which is found in ``lib``.
@@ -532,8 +532,8 @@ class DynELF(object):
         """
         result = None
 
-        if lib == 'libc':
-            lib = 'libc.so'
+        if lib == "libc":
+            lib = "libc.so"
 
         if symb:
             symb = _need_bytes(symb, min_wrong=0x80)
@@ -542,21 +542,23 @@ class DynELF(object):
         # Get a pretty name for the symbol to show the user
         #
         if symb and lib:
-            pretty = '%r in %r' % (symb, lib)
+            pretty = "%r in %r" % (symb, lib)
         else:
             pretty = repr(symb or lib)
 
         if not pretty:
             self.failure("Must specify a library or symbol")
 
-        self.waitfor('Resolving %s' % pretty)
+        self.waitfor("Resolving %s" % pretty)
 
         #
         # If we are loading from a different library, create
         # a DynELF instance for it.
         #
-        if lib is not None: dynlib = self._dynamic_load_dynelf(lib)
-        else:   dynlib = self
+        if lib is not None:
+            dynlib = self._dynamic_load_dynelf(lib)
+        else:
+            dynlib = self
 
         if dynlib is None:
             log.failure("Could not find %r", lib)
@@ -573,7 +575,7 @@ class DynELF(object):
                 log.info("Trying lookup based on Build ID: %s", build_id)
                 path = libcdb.search_by_build_id(build_id)
                 if path:
-                    with context.local(log_level='error'):
+                    with context.local(log_level="error"):
                         e = ELF(path)
                         e.address = dynlib.libbase
                         result = e.symbols[symb]
@@ -586,22 +588,24 @@ class DynELF(object):
         #
         # Did we win?
         #
-        if result: self.success("%#x" % result)
-        else:      self.failure("Could not find %s" % pretty)
+        if result:
+            self.success("%#x" % result)
+        else:
+            self.failure("Could not find %s" % pretty)
 
         return result
 
     def bases(self):
-        '''Resolve base addresses of all loaded libraries.
+        """Resolve base addresses of all loaded libraries.
 
         Return a dictionary mapping library path to its base address.
-        '''
+        """
         if not self._bases:
             if self.link_map is None:
                 self.failure("Cannot determine bases without linkmap")
                 return {}
-                
-            leak    = self.leak
+
+            leak = self.leak
             LinkMap = {32: elf.Elf32_Link_Map, 64: elf.Elf64_Link_Map}[self.elfclass]
 
             cur = self.link_map
@@ -612,11 +616,11 @@ class DynELF(object):
 
             while cur:
                 p_name = leak.field(cur, LinkMap.l_name)
-                name   = leak.s(p_name)
-                addr   = leak.field(cur, LinkMap.l_addr)
-                cur    = leak.field(cur, LinkMap.l_next)
+                name = leak.s(p_name)
+                addr = leak.field(cur, LinkMap.l_addr)
+                cur = leak.field(cur, LinkMap.l_next)
 
-                log.debug('Found %r @ %#x', name, addr)
+                log.debug("Found %r @ %#x", name, addr)
 
                 self._bases[name] = addr
 
@@ -633,8 +637,8 @@ class DynELF(object):
         Returns:
             A DynELF instance for the loaded library, or None.
         """
-        cur     = self.link_map
-        leak    = self.leak
+        cur = self.link_map
+        leak = self.leak
         LinkMap = {32: elf.Elf32_Link_Map, 64: elf.Elf64_Link_Map}[self.elfclass]
 
         # make sure we rewind to the beginning!
@@ -646,13 +650,13 @@ class DynELF(object):
         while cur:
             self.status("link_map entry %#x" % cur)
             p_name = leak.field(cur, LinkMap.l_name)
-            name   = leak.s(p_name)
+            name = leak.s(p_name)
 
             if libname in name:
                 break
 
             if name:
-                self.status('Skipping %r' % name)
+                self.status("Skipping %r" % name)
 
             cur = leak.field(cur, LinkMap.l_next)
         else:
@@ -681,10 +685,9 @@ class DynELF(object):
 
         log.warning("Looking up symbol through DT_JMPREL. This might be slower...")
 
-
-        strtab  = strtab or self._find_dt(constants.DT_STRTAB)
-        symtab  = symtab or self._find_dt(constants.DT_SYMTAB)
-        jmprel  = jmprel or self._find_dt(constants.DT_JMPREL) # .rela.plt
+        strtab = strtab or self._find_dt(constants.DT_STRTAB)
+        symtab = symtab or self._find_dt(constants.DT_SYMTAB)
+        jmprel = jmprel or self._find_dt(constants.DT_JMPREL)  # .rela.plt
 
         strtab = self._make_absolute_ptr(strtab)
         symtab = self._make_absolute_ptr(symtab)
@@ -694,7 +697,7 @@ class DynELF(object):
         # We look for the symbol by iterating through each Elf64_Rel entry.
         # For each Elf64_Rel, get the Elf64_Sym for that entry
         # Then compare the Elf64_Sym.st_name with the symbol name
-       
+
         Rel = {32: elf.Elf32_Rel, 64: elf.Elf64_Rel}[self.elfclass]
         Sym = {32: elf.Elf32_Sym, 64: elf.Elf64_Sym}[self.elfclass]
 
@@ -703,14 +706,14 @@ class DynELF(object):
         while True:
             rel_entry = leak.struct(rel_addr, Rel)
 
-            # We ran out of entries in DT_JMPREL 
+            # We ran out of entries in DT_JMPREL
             if rel_entry.r_offset == 0:
                 return None
 
-            sym_idx = rel_entry.r_info >> 32 # might be different for 32-bit
-            sym_entry_address = symtab + ( sym_idx * sizeof(Sym) )
+            sym_idx = rel_entry.r_info >> 32  # might be different for 32-bit
+            sym_entry_address = symtab + (sym_idx * sizeof(Sym))
             sym_str_off = leak.field(sym_entry_address, Sym.st_name)
-            symb_str = leak.s(strtab+sym_str_off)
+            symb_str = leak.s(strtab + sym_str_off)
 
             if symb_str == symb:
                 w.success("Found matching Elf64_Rel entry!")
@@ -722,29 +725,27 @@ class DynELF(object):
 
         return symbol_address
 
-
-
     def _lookup(self, symb):
         """Performs the actual symbol lookup within one ELF file."""
         leak = self.leak
-        Dyn  = {32: elf.Elf32_Dyn, 64: elf.Elf64_Dyn}[self.elfclass]
-        name = lambda tag: next(k for k,v in ENUM_D_TAG.items() if v == tag)
+        Dyn = {32: elf.Elf32_Dyn, 64: elf.Elf64_Dyn}[self.elfclass]
+        name = lambda tag: next(k for k, v in ENUM_D_TAG.items() if v == tag)
 
-        self.status('.gnu.hash/.hash, .strtab and .symtab offsets')
+        self.status(".gnu.hash/.hash, .strtab and .symtab offsets")
 
         #
         # We need all three of the hash, string table, and symbol table.
         #
-        hshtab  = self._find_dt(constants.DT_GNU_HASH)
-        strtab  = self._find_dt(constants.DT_STRTAB)
-        symtab  = self._find_dt(constants.DT_SYMTAB)
+        hshtab = self._find_dt(constants.DT_GNU_HASH)
+        strtab = self._find_dt(constants.DT_STRTAB)
+        symtab = self._find_dt(constants.DT_SYMTAB)
 
         # Assume GNU hash will hit, since it is the default for GCC.
         if hshtab:
-            hshtype = 'gnu'
+            hshtype = "gnu"
         else:
-            hshtab  = self._find_dt(constants.DT_HASH)
-            hshtype = 'sysv'
+            hshtab = self._find_dt(constants.DT_HASH)
+            hshtype = "sysv"
 
         if not all([strtab, symtab, hshtab]):
             self.failure("Could not find all tables")
@@ -760,7 +761,6 @@ class DynELF(object):
         # Save off our real leaker in case we use the fake leaker
         real_leak = self.leak
         if self.elf:
-
             # Create a fake leaker which just leaks out of the 'loaded' ELF
             # However, we may load things which are outside of the ELF (e.g.
             # the linkmap or GOT) so we need to fall back on the real leak.
@@ -770,11 +770,11 @@ class DynELF(object):
                     return self.elf.read(address, 4)
                 except ValueError:
                     return real_leak.b(address)
+
             # Use fake leaker since ELF is available
             self.leak = fake_leak
 
-        routine = {'sysv': self._resolve_symbol_sysv,
-                   'gnu':  self._resolve_symbol_gnu}[hshtype]
+        routine = {"sysv": self._resolve_symbol_sysv, "gnu": self._resolve_symbol_gnu}[hshtype]
         resolved_addr = routine(self.libbase, symb, hshtab, strtab, symtab)
 
         if resolved_addr:
@@ -809,15 +809,15 @@ class DynELF(object):
             You can force an ELF to use this type of symbol table by compiling
             with 'gcc -Wl,--hash-style=sysv'
         """
-        self.status('.hash parms')
-        leak       = self.leak
-        Sym        = {32: elf.Elf32_Sym, 64: elf.Elf64_Sym}[self.elfclass]
+        self.status(".hash parms")
+        leak = self.leak
+        Sym = {32: elf.Elf32_Sym, 64: elf.Elf64_Sym}[self.elfclass]
 
-        nbucket   = leak.field(hshtab, elf.Elf_HashTable.nbucket)
+        nbucket = leak.field(hshtab, elf.Elf_HashTable.nbucket)
         bucketaddr = hshtab + sizeof(elf.Elf_HashTable)
-        chain      = bucketaddr + (nbucket * 4)
+        chain = bucketaddr + (nbucket * 4)
 
-        self.status('hashmap')
+        self.status("hashmap")
         hsh = sysv_hash(symb) % nbucket
 
         # Get the index out of the bucket for the hash we computed
@@ -825,18 +825,17 @@ class DynELF(object):
 
         while idx != constants.STN_UNDEF:
             # Look up the symbol corresponding to the specified index
-            sym     = symtab + (idx * sizeof(Sym))
-            symtype = leak.field(sym, Sym.st_info) & 0xf
+            sym = symtab + (idx * sizeof(Sym))
+            symtype = leak.field(sym, Sym.st_info) & 0xF
 
             # We only care about functions
             if symtype == constants.STT_FUNC:
-
                 # Leak the name of the function from the symbol table
                 name = leak.s(strtab + leak.field(sym, Sym.st_name))
 
                 # Make sure it matches the name of the symbol we were looking for.
                 if name == symb:
-                    #Bingo
+                    # Bingo
                     addr = libbase + leak.field(sym, Sym.st_value)
                     return addr
 
@@ -846,9 +845,8 @@ class DynELF(object):
             # it did not since it was not a function.
             # Follow the chain for this particular hash.
             idx = leak.d(chain, idx)
-        else:
-            self.failure('Could not find a SYSV hash that matched %#x' % hsh)
-            return None
+        self.failure("Could not find a SYSV hash that matched %#x" % hsh)
+        return None
 
     def _resolve_symbol_gnu(self, libbase, symb, hshtab, strtab, symtab):
         """
@@ -862,16 +860,16 @@ class DynELF(object):
             You can force an ELF to use this type of symbol table by compiling
             with 'gcc -Wl,--hash-style=gnu'
         """
-        self.status('.gnu.hash parms')
+        self.status(".gnu.hash parms")
         leak = self.leak
-        Sym  = {32: elf.Elf32_Sym, 64: elf.Elf64_Sym}[self.elfclass]
+        Sym = {32: elf.Elf32_Sym, 64: elf.Elf64_Sym}[self.elfclass]
 
         # The number of hash buckets (hash % nbuckets)
-        nbuckets  = leak.field(hshtab, elf.GNU_HASH.nbuckets)
+        nbuckets = leak.field(hshtab, elf.GNU_HASH.nbuckets)
 
         # Index of the first accessible symbol in the hash table
         # Numbering doesn't start at zero, it starts at symndx
-        symndx    = leak.field(hshtab, elf.GNU_HASH.symndx)
+        symndx = leak.field(hshtab, elf.GNU_HASH.symndx)
 
         # Number of things in the bloom filter.
         # We don't care about the contents, but we have to skip over it.
@@ -882,29 +880,29 @@ class DynELF(object):
         buckets = hshtab + sizeof(elf.GNU_HASH) + (elfword * maskwords)
 
         # The chains come after the buckets
-        chains  = buckets + (4 * nbuckets)
+        chains = buckets + (4 * nbuckets)
 
-        self.status('hash chain index')
+        self.status("hash chain index")
 
         # Hash the symbol, find its bucket
-        hsh    = gnu_hash(symb)
+        hsh = gnu_hash(symb)
         bucket = hsh % nbuckets
 
         # Get the first index in the chain for that bucket
-        ndx    = leak.d(buckets, bucket)
+        ndx = leak.d(buckets, bucket)
         if ndx == 0:
-            self.failure('Empty chain')
+            self.failure("Empty chain")
             return None
 
         # Find the start of the chain, taking into account that numbering
         # effectively starts at 'symndx' within the chains.
-        chain  = chains + 4 * (ndx - symndx)
+        chain = chains + 4 * (ndx - symndx)
 
-        self.status('hash chain')
+        self.status("hash chain")
 
         # Iteratively get the I'th entry from the hash chain, until we find
         # one that matches.
-        i    = 0
+        i = 0
         hsh &= ~1
 
         # The least significant bit is used as a stopper bit.
@@ -914,32 +912,30 @@ class DynELF(object):
             hsh2 = leak.d(chain, i)
             if hsh == (hsh2 & ~1):
                 # Check for collision on hash values
-                sym  = symtab + sizeof(Sym) * (ndx + i)
+                sym = symtab + sizeof(Sym) * (ndx + i)
                 name = leak.s(strtab + leak.field(sym, Sym.st_name))
 
                 if name == symb:
                     # No collision, get offset and calculate address
                     offset = leak.field(sym, Sym.st_value)
-                    addr   = offset + libbase
+                    addr = offset + libbase
                     return addr
 
                 self.status("%r (hash collision)" % name)
 
             # Collision or no match, continue to the next item
             i += 1
-        else:
-            self.failure('Could not find a GNU hash that matched %#x' % hsh)
-            return None
+        self.failure("Could not find a GNU hash that matched %#x" % hsh)
+        return None
 
-    def _lookup_build_id(self, lib = None):
-
+    def _lookup_build_id(self, lib=None):
         libbase = self.libbase
         if not self.link_map:
             self.status("No linkmap found")
             return None
 
         if lib is not None:
-            libbase = self.lookup(symb = None, lib = lib)
+            libbase = self.lookup(symb=None, lib=lib)
 
         if not libbase:
             self.status("Couldn't find libc base")
@@ -948,7 +944,7 @@ class DynELF(object):
         for offset in libcdb.get_build_id_offsets():
             address = libbase + offset
             if self.leak.compare(address + 0xC, b"GNU\x00"):
-                return enhex(b''.join(self.leak.raw(address + 0x10, 20)))
+                return enhex(b"".join(self.leak.raw(address + 0x10, 20)))
             else:
                 self.status("Build ID not found at offset %#x" % offset)
                 pass
@@ -966,7 +962,7 @@ class DynELF(object):
 
         # if the ELF type is not DYN, the value is a pointer
 
-        if self.elftype != 'DYN':
+        if self.elftype != "DYN":
             return if_ptr
 
         # if the ELF type may be DYN, guess
@@ -980,10 +976,10 @@ class DynELF(object):
         """Finds a pointer to the stack via __environ, which is an exported
         symbol in libc, which points to the environment block.
         """
-        symbols = ['environ', '_environ', '__environ']
+        symbols = ["environ", "_environ", "__environ"]
 
         for symbol in symbols:
-            environ = self.lookup(symbol, 'libc')
+            environ = self.lookup(symbol, "libc")
 
             if environ:
                 break
@@ -992,7 +988,7 @@ class DynELF(object):
 
         stack = self.leak.p(environ)
 
-        self.success('*environ: %#x' % stack)
+        self.success("*environ: %#x" % stack)
 
         return stack
 
@@ -1000,42 +996,43 @@ class DynELF(object):
         """Finds the beginning of the heap via __curbrk, which is an exported
         symbol in the linker, which points to the current brk.
         """
-        curbrk = self.lookup('__curbrk', 'libc')
-        brk    = self.leak.p(curbrk)
+        curbrk = self.lookup("__curbrk", "libc")
+        brk = self.leak.p(curbrk)
 
-        self.success('*curbrk: %#x' % brk)
+        self.success("*curbrk: %#x" % brk)
 
         return brk
 
-    def _find_mapped_pages(self, readonly = False, page_size = 0x1000):
+    def _find_mapped_pages(self, readonly=False, page_size=0x1000):
         """
         A generator of all mapped pages, as found using the Program Headers.
 
         Yields tuples of the form: (virtual address, memory size)
         """
-        leak  = self.leak
-        base  = self.libbase
+        leak = self.leak
+        base = self.libbase
 
-        Ehdr  = {32: elf.Elf32_Ehdr, 64: elf.Elf64_Ehdr}[self.elfclass]
-        Phdr  = {32: elf.Elf32_Phdr, 64: elf.Elf64_Phdr}[self.elfclass]
+        Ehdr = {32: elf.Elf32_Ehdr, 64: elf.Elf64_Ehdr}[self.elfclass]
+        Phdr = {32: elf.Elf32_Phdr, 64: elf.Elf64_Phdr}[self.elfclass]
 
         phead = base + leak.field(base, Ehdr.e_phoff)
         phnum = leak.field(base, Ehdr.e_phnum)
 
         for i in range(phnum):
-            if leak.field_compare(phead, Phdr.p_type, constants.PT_LOAD) :
+            if leak.field_compare(phead, Phdr.p_type, constants.PT_LOAD):
                 # the interesting pages are those that are aligned to PAGE_SIZE
-                if leak.field_compare(phead, Phdr.p_align, page_size) and \
-                    (readonly or leak.field(phead, Phdr.p_flags) & 0x02 != 0):
+                if leak.field_compare(phead, Phdr.p_align, page_size) and (
+                    readonly or leak.field(phead, Phdr.p_flags) & 0x02 != 0
+                ):
                     vaddr = leak.field(phead, Phdr.p_vaddr)
                     memsz = leak.field(phead, Phdr.p_memsz)
                     # fix relative offsets
-                    if vaddr < base :
+                    if vaddr < base:
                         vaddr += base
                     yield vaddr, memsz
             phead += sizeof(Phdr)
 
-    def dump(self, libs = False, readonly = False):
+    def dump(self, libs=False, readonly=False):
         """dump(libs = False, readonly = False)
 
         Dumps the ELF's memory pages to allow further analysis.
@@ -1047,13 +1044,13 @@ class DynELF(object):
         Returns:
             a dictionary of the form: { address : bytes }
         """
-        leak      = self.leak
+        leak = self.leak
         page_size = 0x1000
-        pages     = {}
+        pages = {}
 
-        for vaddr, memsz in self._find_mapped_pages(readonly, page_size) :
-            offset    = vaddr % page_size
-            if offset != 0 :
+        for vaddr, memsz in self._find_mapped_pages(readonly, page_size):
+            offset = vaddr % page_size
+            if offset != 0:
                 memsz += offset
                 vaddr -= offset
             memsz += (page_size - (memsz % page_size)) % page_size
@@ -1065,6 +1062,6 @@ class DynELF(object):
                     continue
                 dyn_lib = self._dynamic_load_dynelf(lib_name)
                 if dyn_lib is not None:
-                    pages.update(dyn_lib.dump(readonly = readonly))
+                    pages.update(dyn_lib.dump(readonly=readonly))
 
         return pages

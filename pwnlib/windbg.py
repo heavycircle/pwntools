@@ -56,23 +56,22 @@ You can cause these lines to be a no-op by running your script with the
 Member Documentation
 ===============================
 """
-from __future__ import absolute_import
+from __future__ import annotations
+
 import atexit
 import os
 import signal
-
 import subprocess
 
 from pwnlib import tubes
-from pwnlib.context import LocalContext
-from pwnlib.context import context
+from pwnlib.context import LocalContext, context
 from pwnlib.log import getLogger
-from pwnlib.util import misc
-from pwnlib.util import proc
+from pwnlib.util import misc, proc
 
 log = getLogger(__name__)
 
 CREATE_SUSPENDED = 0x00000004
+
 
 @LocalContext
 def debug(args, windbgscript=None, exe=None, env=None, creationflags=0, **kwargs):
@@ -103,25 +102,24 @@ def debug(args, windbgscript=None, exe=None, env=None, creationflags=0, **kwargs
         When WinDbg opens via :func:`.debug`, it will initially be stopped on the very first
         instruction of the entry point.
     """
-    if isinstance(
-        args, (int, tubes.process.process, tubes.ssh.ssh_channel)
-    ):
+    if isinstance(args, (int, tubes.process.process, tubes.ssh.ssh_channel)):
         log.error("Use windbg.attach() to debug a running process")
 
     if context.noptrace:
         log.warn_once("Skipping debugger since context.noptrace==True")
         return tubes.process.process(args, executable=exe, env=env, creationflags=creationflags)
-    
-    windbgscript = windbgscript or ''
+
+    windbgscript = windbgscript or ""
     if isinstance(windbgscript, str):
-        windbgscript = windbgscript.split('\n')
+        windbgscript = windbgscript.split("\n")
     # resume main thread
-    windbgscript = ['~0m'] + windbgscript
+    windbgscript = ["~0m"] + windbgscript
     creationflags |= CREATE_SUSPENDED
     io = tubes.process.process(args, executable=exe, env=env, creationflags=creationflags)
     attach(target=io, windbgscript=windbgscript, **kwargs)
 
     return io
+
 
 def binary():
     """binary() -> str
@@ -131,10 +129,11 @@ def binary():
     Returns:
         str: Path to the appropriate ``windbg`` binary to use.
     """
-    windbg = misc.which('windbgx.exe') or misc.which('windbg.exe')
+    windbg = misc.which("windbgx.exe") or misc.which("windbg.exe")
     if not windbg:
-        log.error('windbg is not installed or in system PATH')
+        log.error("windbg is not installed or in system PATH")
     return windbg
+
 
 @LocalContext
 def attach(target, windbgscript=None, windbg_args=[]):
@@ -160,7 +159,7 @@ def attach(target, windbgscript=None, windbg_args=[]):
             Process name.  The youngest process is selected.
         :class:`.process`
             Process to connect to
-    
+
     Examples:
 
         Attach to a process by PID
@@ -192,32 +191,31 @@ def attach(target, windbgscript=None, windbg_args=[]):
         # pidof picks the youngest process
         pids = list(proc.pidof(target))
         if not pids:
-            log.error('No such process: %s', target)
+            log.error("No such process: %s", target)
         pid = pids[0]
-        log.info('Attaching to youngest process "%s" (PID = %d)' %
-                 (target, pid))
+        log.info('Attaching to youngest process "%s" (PID = %d)' % (target, pid))
     elif isinstance(target, tubes.process.process):
         pid = proc.pidof(target)[0]
     else:
         log.error("don't know how to attach to target: %r", target)
 
     if not pid:
-        log.error('could not find target process')
-    
+        log.error("could not find target process")
+
     cmd = [binary()]
     if windbg_args:
         cmd.extend(windbg_args)
-    
-    cmd.extend(['-p', str(pid)])
 
-    windbgscript = windbgscript or ''
+    cmd.extend(["-p", str(pid)])
+
+    windbgscript = windbgscript or ""
     if isinstance(windbgscript, str):
-        windbgscript = windbgscript.split('\n')
+        windbgscript = windbgscript.split("\n")
     if isinstance(windbgscript, list):
-        windbgscript = ';'.join(script.strip() for script in windbgscript if script.strip())
+        windbgscript = ";".join(script.strip() for script in windbgscript if script.strip())
     if windbgscript:
-        cmd.extend(['-c', windbgscript])
-    
+        cmd.extend(["-c", windbgscript])
+
     log.info("Launching a new process: %r" % cmd)
 
     io = subprocess.Popen(cmd)

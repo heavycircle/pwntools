@@ -1,5 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import itertools
 import os
@@ -20,17 +19,19 @@ class module(ModuleType):
         super(module, self).__init__(name)
 
         # Insert nice properties
-        self.__dict__.update({
-            '__file__':    __file__,
-            '__package__': __package__,
-            '__path__':    __path__,
-        })
+        self.__dict__.update(
+            {
+                "__file__": __file__,
+                "__package__": __package__,
+                "__path__": __path__,
+            }
+        )
 
         # Save the shellcode directory
         self._dir = directory
 
         # Find the absolute path of the directory
-        self._absdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates', self._dir)
+        self._absdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", self._dir)
 
         # Get the docstring
         with open(os.path.join(self._absdir, "__doc__")) as fd:
@@ -41,20 +42,19 @@ class module(ModuleType):
 
     def _get_source(self, template):
         assert template in self.templates
-        return os.path.join(self._absdir, *template.split('.')) + '.asm'
+        return os.path.join(self._absdir, *template.split(".")) + ".asm"
 
     def __lazyinit__(self):
-
         # Create a dictionary of submodules
         self._submodules = {}
         self._shellcodes = {}
         for name in os.listdir(self._absdir):
             path = os.path.join(self._absdir, name)
             if os.path.isdir(path):
-                self._submodules[name] = module(self.__name__ + '.' + name, os.path.join(self._dir, name))
-            elif os.path.isfile(path) and name != '__doc__' and name[0] != '.':
+                self._submodules[name] = module(self.__name__ + "." + name, os.path.join(self._dir, name))
+            elif os.path.isfile(path) and name != "__doc__" and name[0] != ".":
                 funcname, _ext = os.path.splitext(name)
-                if not re.match('^[a-zA-Z_][a-zA-Z0-9_]*$', funcname):
+                if not re.match("^[a-zA-Z_][a-zA-Z0-9_]*$", funcname):
                     raise ValueError("found illegal filename, %r" % name)
                 self._shellcodes[funcname] = name
 
@@ -95,8 +95,7 @@ class module(ModuleType):
         self.__lazyinit__ and self.__lazyinit__()
 
         result = list(self._submodules.keys())
-        result.extend(('__file__', '__package__', '__path__',
-                       '__all__',  '__name__'))
+        result.extend(("__file__", "__package__", "__path__", "__all__", "__name__"))
         result.extend(self.__shellcodes__())
 
         return result
@@ -104,7 +103,7 @@ class module(ModuleType):
     def _context_modules(self):
         self.__lazyinit__ and self.__lazyinit__()
         for k, m in self._submodules.items():
-            if k in [context.arch, context.os, 'syscalls']:
+            if k in [context.arch, context.os, "syscalls"]:
                 yield m
 
     def __shellcodes__(self):
@@ -119,16 +118,16 @@ class module(ModuleType):
         if self._templates:
             return self._templates
 
-        template_dir = os.path.join(os.path.dirname(__file__), 'templates')
-        templates    = []
+        template_dir = os.path.join(os.path.dirname(__file__), "templates")
+        templates = []
 
         for root, _, files in os.walk(template_dir, followlinks=True):
-            for file in filter(lambda x: x.endswith('.asm'), files):
+            for file in filter(lambda x: x.endswith(".asm"), files):
                 value = os.path.splitext(file)[0]
                 value = os.path.join(root, value)
-                value = value.replace(template_dir, '')
-                value = value.replace(os.path.sep, '.')
-                value = value.lstrip('.')
+                value = value.replace(template_dir, "")
+                value = value.replace(os.path.sep, ".")
+                value = value.lstrip(".")
                 templates.append(value)
 
         templates = sorted(templates)
@@ -144,37 +143,41 @@ class module(ModuleType):
         if isinstance(n, (str, bytes, list, tuple, dict)):
             r = repr(n)
             if not comment:  # then it can be inside a comment!
-                r = r.replace('*/', r'\x2a/')
+                r = r.replace("*/", r"\x2a/")
             return r
         if not isinstance(n, int):
             return n
         if isinstance(n, constants.Constant):
-            if comment: return '%s /* %s */' % (n,self.pretty(int(n)))
-            else:       return '%s (%s)'     % (n,self.pretty(int(n)))
+            if comment:
+                return "%s /* %s */" % (n, self.pretty(int(n)))
+            else:
+                return "%s (%s)" % (n, self.pretty(int(n)))
         elif abs(n) < 10:
-            return '%d' % n
+            return "%d" % n
         else:
-            return '%#x' % n
+            return "%#x" % n
 
     def okay(self, s, *a, **kw):
         if isinstance(s, int):
             s = packing.pack(s, *a, **kw)
-        return b'\0' not in s and b'\n' not in s
+        return b"\0" not in s and b"\n" not in s
 
     from pwnlib.shellcraft import registers
+
 
 # To prevent garbage collection
 tether = sys.modules[__name__]
 
 # Create the module structure
-shellcraft = module(__name__, '')
+shellcraft = module(__name__, "")
+
 
 class LazyImporter:
     def find_module(self, fullname, path=None):
-        if not fullname.startswith('pwnlib.shellcraft.'):
+        if not fullname.startswith("pwnlib.shellcraft."):
             return None
 
-        parts = fullname.split('.')[2:]
+        parts = fullname.split(".")[2:]
         cur = shellcraft
         for part in parts:
             cur = getattr(cur, part, None)
@@ -185,5 +188,6 @@ class LazyImporter:
 
     def load_module(self, fullname):
         return sys.modules[fullname]
+
 
 sys.meta_path.append(LazyImporter())

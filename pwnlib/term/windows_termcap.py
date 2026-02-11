@@ -1,17 +1,19 @@
-import os
-import msvcrt
+from __future__ import annotations
+
 import ctypes
-import sys
+import msvcrt
+import os
 from ctypes import wintypes
 
-__all__ = ['get']
+__all__ = ["get"]
 
 cache = None
 
-def get(cap, *args, **kwargs):
-    default = kwargs.pop('default', '')
 
-    if 'PWNLIB_NOTERM' in os.environ:
+def get(cap, *args, **kwargs):
+    default = kwargs.pop("default", "")
+
+    if "PWNLIB_NOTERM" in os.environ:
         return default
 
     if kwargs != {}:
@@ -19,7 +21,7 @@ def get(cap, *args, **kwargs):
 
     if cache is None:
         init()
-    
+
     s = cache.get(cap)
     if s:
         if args:
@@ -27,11 +29,12 @@ def get(cap, *args, **kwargs):
         return s
     return default
 
+
 def init():
     global cache
     cache = {}
 
-    if 'PWNLIB_NOTERM' not in os.environ:
+    if "PWNLIB_NOTERM" not in os.environ:
         try:
             enable_vt_mode()
         except:
@@ -40,25 +43,28 @@ def init():
 
     # Setup capabilities similar to curses on unix.
     # https://docs.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences
-    cache['colors'] = 256
-    cache['reset'] = '\x1b[0m'
-    cache['bold'] = '\x1b[1m'
-    cache['smul'] = '\x1b[4m'
-    cache['rev'] = '\x1b[7m'
-    cache['setaf'] = lambda c: '\x1b[3{}m'.format(c) if c < 8 else '\x1b[9{}m'.format(c-8)
-    cache['setab'] = lambda c: '\x1b[4{}m'.format(c) if c < 8 else '\x1b[10{}m'.format(c-8)
+    cache["colors"] = 256
+    cache["reset"] = "\x1b[0m"
+    cache["bold"] = "\x1b[1m"
+    cache["smul"] = "\x1b[4m"
+    cache["rev"] = "\x1b[7m"
+    cache["setaf"] = lambda c: f"\x1b[3{c}m" if c < 8 else f"\x1b[9{c - 8}m"
+    cache["setab"] = lambda c: f"\x1b[4{c}m" if c < 8 else f"\x1b[10{c - 8}m"
+
 
 # Enable ANSI escape sequences on Windows 10.
 # https://bugs.python.org/issue30075
-kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
 ERROR_INVALID_PARAMETER = 0x0057
 ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+
 
 def _check_bool(result, func, args):
     if not result:
         raise ctypes.WinError(ctypes.get_last_error())
     return args
+
 
 LPDWORD = ctypes.POINTER(wintypes.DWORD)
 kernel32.GetConsoleMode.errcheck = _check_bool
@@ -66,10 +72,11 @@ kernel32.GetConsoleMode.argtypes = (wintypes.HANDLE, LPDWORD)
 kernel32.SetConsoleMode.errcheck = _check_bool
 kernel32.SetConsoleMode.argtypes = (wintypes.HANDLE, wintypes.DWORD)
 
-def set_conout_mode(new_mode, mask=0xffffffff):
+
+def set_conout_mode(new_mode, mask=0xFFFFFFFF):
     # don't assume StandardOutput is a console.
     # open CONOUT$ instead
-    fdout = os.open('CONOUT$', os.O_RDWR)
+    fdout = os.open("CONOUT$", os.O_RDWR)
     try:
         hout = msvcrt.get_osfhandle(fdout)
         old_mode = wintypes.DWORD()
@@ -80,11 +87,12 @@ def set_conout_mode(new_mode, mask=0xffffffff):
     finally:
         os.close(fdout)
 
+
 def enable_vt_mode():
     mode = mask = ENABLE_VIRTUAL_TERMINAL_PROCESSING
     try:
         return set_conout_mode(mode, mask)
-    except WindowsError as e:
+    except OSError as e:
         if e.winerror == ERROR_INVALID_PARAMETER:
             raise NotImplementedError
         raise

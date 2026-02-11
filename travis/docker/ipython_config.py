@@ -1,10 +1,11 @@
 # Configuration file for ipython.
+from __future__ import annotations
 
 c = get_config()
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # InteractiveShellApp configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # A Mixin for applications that start InteractiveShell instances.
 #
@@ -29,9 +30,9 @@ c = get_config()
 
 # lines of code to run at IPython startup.
 c.InteractiveShell.confirm_exit = False
-c.InteractiveShell.separate_in = ''
-c.InteractiveShell.separate_out = ''
-c.InteractiveShell.separate_out2 = ''
+c.InteractiveShell.separate_in = ""
+c.InteractiveShell.separate_out = ""
+c.InteractiveShell.separate_out2 = ""
 
 # c.PromptManager.in_template  = '>>> '
 # c.PromptManager.in2_template = '..: '
@@ -42,22 +43,22 @@ c.TerminalIPythonApp.display_banner = False
 
 from IPython.terminal.prompts import Prompts, Token
 
+
 class ClassicPrompts(Prompts):
     def in_prompt_tokens(self, cli=None):
         return [
-            (Token.Prompt, '>>> '),
+            (Token.Prompt, ">>> "),
         ]
 
     def continuation_prompt_tokens(self, cli=None, width=None):
-        return [
-            (Token.Prompt, '... ')
-        ]
+        return [(Token.Prompt, "... ")]
 
     def rewrite_prompt_tokens(self):
         return []
 
     def out_prompt_tokens(self):
         return []
+
 
 c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 
@@ -97,9 +98,9 @@ c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 # A file to be run
 # c.InteractiveShellApp.file_to_run = ''
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # TerminalIPythonApp configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # TerminalIPythonApp will inherit config from: BaseIPythonApplication,
 # Application, InteractiveShellApp
@@ -199,9 +200,9 @@ c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 # The Logging format template
 # c.TerminalIPythonApp.log_format = '[%(name)s]%(highlevel)s %(message)s'
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # TerminalInteractiveShell configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # TerminalInteractiveShell will inherit config from: InteractiveShell
 
@@ -356,9 +357,9 @@ c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 # Automatically call the pdb debugger after every exception.
 # c.TerminalInteractiveShell.pdb = False
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # PromptManager configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # This is the primary interface for producing IPython's prompts.
 
@@ -377,9 +378,9 @@ c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 #
 # c.PromptManager.color_scheme = 'Linux'
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # HistoryManager configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # A class to organize all history-related functionality in one place.
 
@@ -418,9 +419,9 @@ c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 # This may be necessary in some threaded environments where IPython is embedded.
 # c.HistoryManager.enabled = True
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # ProfileDir configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # An object to manage the profile directory and its resources.
 #
@@ -434,9 +435,9 @@ c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 # `profile` option.
 # c.ProfileDir.location = u''
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # PlainTextFormatter configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # The default pretty-printer.
 #
@@ -486,9 +487,9 @@ c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 #
 # c.PlainTextFormatter.singleton_printers = {}
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # IPCompleter configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # Extension of the completer class with IPython-specific features
 
@@ -526,9 +527,9 @@ c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 # etc., but can be unsafe because the code is actually evaluated on TAB.
 # c.IPCompleter.greedy = False
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # ScriptMagics configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # Magics for talking to scripts
 #
@@ -550,9 +551,9 @@ c.TerminalInteractiveShell.prompts_class = ClassicPrompts
 # the right interpreter.
 # c.ScriptMagics.script_paths = {}
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # StoreMagics configuration
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # Lightweight persistence for python variables.
 #

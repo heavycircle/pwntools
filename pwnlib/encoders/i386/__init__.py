@@ -1,5 +1,3 @@
-from __future__ import absolute_import
+from __future__ import annotations
 
-from pwnlib.encoders.i386 import ascii_shellcode
-from pwnlib.encoders.i386 import delta
-from pwnlib.encoders.i386 import xor
+from pwnlib.encoders.i386 import ascii_shellcode, delta, xor

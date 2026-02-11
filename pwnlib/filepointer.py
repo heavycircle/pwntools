@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 File Structure Exploitation
@@ -22,8 +21,7 @@ Now payload contains the FILE structure with its vtable pointer pointing to 0xca
 Currently only 'amd64' and 'i386' architectures are supported
 """
 
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import annotations
 
 import ctypes
 
@@ -33,42 +31,42 @@ from pwnlib.util.packing import pack, unpack
 
 log = getLogger(__name__)
 
-length=0
-size='size'
-name='name'
+length = 0
+size = "size"
+name = "name"
 
-variables={
-    0:{name:'flags',size:length},
-    1:{name:'_IO_read_ptr',size:length},
-    2:{name:'_IO_read_end',size:length},
-    3:{name:'_IO_read_base',size:length},
-    4:{name:'_IO_write_base',size:length},
-    5:{name:'_IO_write_ptr',size:length},
-    6:{name:'_IO_write_end',size:length},
-    7:{name:'_IO_buf_base',size:length},
-    8:{name:'_IO_buf_end',size:length},
-    9:{name:'_IO_save_base',size:length},
-    10:{name:'_IO_backup_base',size:length},
-    11:{name:'_IO_save_end',size:length},
-    12:{name:'markers',size:length},
-    13:{name:'chain',size:length},
-    14:{name:'fileno',size:4},
-    15:{name:'_flags2',size:4},
-    16:{name:'_old_offset',size:length},
-    17:{name:'_cur_column',size:2},
-    18:{name:'_vtable_offset',size:1},
-    19:{name:'_shortbuf',size:1},
-    20:{name:'unknown1',size:-4},
-    21:{name:'_lock',size:length},
-    22:{name:'_offset',size:8},
-    23:{name:'_codecvt',size:length},
-    24:{name:'_wide_data',size:length},
-    25:{name:'_freeres_list',size:length},
-    26:{name:'_freeres_buf',size:length},
-    27:{name:'_pad5',size:length},
-    28:{name:'_mode',size:4},
-    29:{name:'_unused2',size:length},
-    30:{name:'vtable',size:length}
+variables = {
+    0: {name: "flags", size: length},
+    1: {name: "_IO_read_ptr", size: length},
+    2: {name: "_IO_read_end", size: length},
+    3: {name: "_IO_read_base", size: length},
+    4: {name: "_IO_write_base", size: length},
+    5: {name: "_IO_write_ptr", size: length},
+    6: {name: "_IO_write_end", size: length},
+    7: {name: "_IO_buf_base", size: length},
+    8: {name: "_IO_buf_end", size: length},
+    9: {name: "_IO_save_base", size: length},
+    10: {name: "_IO_backup_base", size: length},
+    11: {name: "_IO_save_end", size: length},
+    12: {name: "markers", size: length},
+    13: {name: "chain", size: length},
+    14: {name: "fileno", size: 4},
+    15: {name: "_flags2", size: 4},
+    16: {name: "_old_offset", size: length},
+    17: {name: "_cur_column", size: 2},
+    18: {name: "_vtable_offset", size: 1},
+    19: {name: "_shortbuf", size: 1},
+    20: {name: "unknown1", size: -4},
+    21: {name: "_lock", size: length},
+    22: {name: "_offset", size: 8},
+    23: {name: "_codecvt", size: length},
+    24: {name: "_wide_data", size: length},
+    25: {name: "_freeres_list", size: length},
+    26: {name: "_freeres_buf", size: length},
+    27: {name: "_pad5", size: length},
+    28: {name: "_mode", size: 4},
+    29: {name: "_unused2", size: length},
+    30: {name: "vtable", size: length},
 }
 
 del name, size, length
@@ -90,36 +88,38 @@ def _update_var(l):
         >>> _update_var(8)
         {'flags': 8, '_IO_read_ptr': 8, '_IO_read_end': 8, '_IO_read_base': 8, '_IO_write_base': 8, '_IO_write_ptr': 8, '_IO_write_end': 8, '_IO_buf_base': 8, '_IO_buf_end': 8, '_IO_save_base': 8, '_IO_backup_base': 8, '_IO_save_end': 8, 'markers': 8, 'chain': 8, 'fileno': 4, '_flags2': 4, '_old_offset': 8, '_cur_column': 2, '_vtable_offset': 1, '_shortbuf': 1, 'unknown1': 4, '_lock': 8, '_offset': 8, '_codecvt': 8, '_wide_data': 8, '_freeres_list': 8, '_freeres_buf': 8, '_pad5': 8, '_mode': 4, '_unused2': 20, 'vtable': 8}
     """
-    var={}
+    var = {}
     for i in variables:
-        var[variables[i]['name']]=variables[i]['size']
+        var[variables[i]["name"]] = variables[i]["size"]
     for i in var:
-        if var[i]<=0:
-            var[i]+=l
-    if l==4:
-        var['_unused2']=40
+        if var[i] <= 0:
+            var[i] += l
+    if l == 4:
+        var["_unused2"] = 40
     else:
-        var['_unused2']=20
+        var["_unused2"] = 20
     return var
 
+
 class IO_flags:
-    _IO_MAGIC =         0xFBAD0000 # Magic number
-    _IO_MAGIC_MASK =    0xFFFF0000
-    _IO_USER_BUF =          0x0001 # Don't deallocate buffer on close.
-    _IO_UNBUFFERED =        0x0002
-    _IO_NO_READS =          0x0004 # Reading not allowed.
-    _IO_NO_WRITES =         0x0008 # Writing not allowed.
-    _IO_EOF_SEEN =          0x0010
-    _IO_ERR_SEEN =          0x0020
-    _IO_DELETE_DONT_CLOSE = 0x0040 # Don't call close(_fileno) on close.
-    _IO_LINKED =            0x0080 # In the list of all open files.
-    _IO_IN_BACKUP =         0x0100
-    _IO_LINE_BUF =          0x0200
-    _IO_TIED_PUT_GET =      0x0400 # Put and get pointer move in unison.
+    _IO_MAGIC = 0xFBAD0000  # Magic number
+    _IO_MAGIC_MASK = 0xFFFF0000
+    _IO_USER_BUF = 0x0001  # Don't deallocate buffer on close.
+    _IO_UNBUFFERED = 0x0002
+    _IO_NO_READS = 0x0004  # Reading not allowed.
+    _IO_NO_WRITES = 0x0008  # Writing not allowed.
+    _IO_EOF_SEEN = 0x0010
+    _IO_ERR_SEEN = 0x0020
+    _IO_DELETE_DONT_CLOSE = 0x0040  # Don't call close(_fileno) on close.
+    _IO_LINKED = 0x0080  # In the list of all open files.
+    _IO_IN_BACKUP = 0x0100
+    _IO_LINE_BUF = 0x0200
+    _IO_TIED_PUT_GET = 0x0400  # Put and get pointer move in unison.
     _IO_CURRENTLY_PUTTING = 0x0800
-    _IO_IS_APPENDING =      0x1000
-    _IO_IS_FILEBUF =        0x2000
-    _IO_USER_LOCK =         0x8000
+    _IO_IS_APPENDING = 0x1000
+    _IO_IS_FILEBUF = 0x2000
+    _IO_USER_LOCK = 0x8000
+
 
 class IO_flags2:
     _IO_FLAGS2_MMAP = 1
@@ -129,12 +129,13 @@ class IO_flags2:
     _IO_FLAGS2_CLOEXEC = 64
     _IO_FLAGS2_NEED_LOCK = 128
 
+
 class _FlagsUnionBase(ctypes.Union):
     def __getattr__(self, name):
         if any(name == field[0] for field in self._flags_bits._fields_):
             return getattr(self._flags_bits, name)
         return super().__getattr__(name)
-    
+
     def __setattr__(self, name, value):
         if any(name == field[0] for field in self._flags_bits._fields_):
             setattr(self._flags_bits, name, value)
@@ -144,33 +145,35 @@ class _FlagsUnionBase(ctypes.Union):
         return int(self._flags)
 
     def __str__(self):
-        return "{:#x} ({})".format(self._flags, self._flags_bits)
+        return f"{self._flags:#x} ({self._flags_bits})"
+
 
 # https://elixir.bootlin.com/glibc/glibc-2.41/source/libio/libio.h#L66
 class _IOFileFlags_bits(ctypes.LittleEndianStructure):
     _pack_ = 1
     _fields_ = [
-        ("_IO_USER_BUF", ctypes.c_uint8, 1), # Don't deallocate buffer on close.
+        ("_IO_USER_BUF", ctypes.c_uint8, 1),  # Don't deallocate buffer on close.
         ("_IO_UNBUFFERED", ctypes.c_uint8, 1),
-        ("_IO_NO_READS", ctypes.c_uint8, 1), # Reading not allowed.
-        ("_IO_NO_WRITES", ctypes.c_uint8, 1), # Writing not allowed.
+        ("_IO_NO_READS", ctypes.c_uint8, 1),  # Reading not allowed.
+        ("_IO_NO_WRITES", ctypes.c_uint8, 1),  # Writing not allowed.
         ("_IO_EOF_SEEN", ctypes.c_uint8, 1),
         ("_IO_ERR_SEEN", ctypes.c_uint8, 1),
-        ("_IO_DELETE_DONT_CLOSE", ctypes.c_uint8, 1), # Don't call close(_fileno) on close.
-        ("_IO_LINKED", ctypes.c_uint8, 1), # In the list of all open files.
+        ("_IO_DELETE_DONT_CLOSE", ctypes.c_uint8, 1),  # Don't call close(_fileno) on close.
+        ("_IO_LINKED", ctypes.c_uint8, 1),  # In the list of all open files.
         ("_IO_IN_BACKUP", ctypes.c_uint8, 1),
         ("_IO_LINE_BUF", ctypes.c_uint8, 1),
-        ("_IO_TIED_PUT_GET", ctypes.c_uint8, 1), # Put and get pointer move in unison.
+        ("_IO_TIED_PUT_GET", ctypes.c_uint8, 1),  # Put and get pointer move in unison.
         ("_IO_CURRENTLY_PUTTING", ctypes.c_uint8, 1),
         ("_IO_IS_APPENDING", ctypes.c_uint8, 1),
         ("_IO_IS_FILEBUF", ctypes.c_uint8, 1),
-        ("_IO_BAD_SEEN__UNUSED", ctypes.c_uint8, 1), # No longer used, reserved for compat.
+        ("_IO_BAD_SEEN__UNUSED", ctypes.c_uint8, 1),  # No longer used, reserved for compat.
         ("_IO_USER_LOCK", ctypes.c_uint8, 1),
-        ("_IO_MAGIC", ctypes.c_uint16, 16), # Magic number 0xFBAD0000.
+        ("_IO_MAGIC", ctypes.c_uint16, 16),  # Magic number 0xFBAD0000.
     ]
 
     def __str__(self):
         return " | ".join(name for name, _, _ in self._fields_ if getattr(self, name))
+
 
 class _IOFileFlags(_FlagsUnionBase):
     _fields_ = [
@@ -194,6 +197,7 @@ class _IOFileFlags2_bits(ctypes.LittleEndianStructure):
     def __str__(self):
         return " | ".join(name for name, _, _ in self._fields_ if getattr(self, name))
 
+
 class _IOFileFlags2(_FlagsUnionBase):
     _fields_ = [
         ("_flags", ctypes.c_uint64),
@@ -201,7 +205,7 @@ class _IOFileFlags2(_FlagsUnionBase):
     ]
 
 
-class FileStructure(object):
+class FileStructure:
     r"""
     Crafts a FILE structure, with default values for some fields, like _lock which should point to null ideally, set.
 
@@ -267,51 +271,50 @@ class FileStructure(object):
          vtable: 0x0}
     """
 
-    vars_=[]
-    length={}
+    vars_ = []
+    length = {}
 
     def __init__(self, null=0):
-            self.vars_ = [variables[i]['name'] for i in sorted(variables.keys())]
-            self.setdefault(null)
-            self.length = _update_var(context.bytes)
-            self._old_offset = (1 << context.bits) - 1
+        self.vars_ = [variables[i]["name"] for i in sorted(variables.keys())]
+        self.setdefault(null)
+        self.length = _update_var(context.bytes)
+        self._old_offset = (1 << context.bits) - 1
 
-    def __setattr__(self,item,value):
+    def __setattr__(self, item, value):
         if item in FileStructure.__dict__ or item in self.vars_:
             if hasattr(self, item) and isinstance(getattr(self, item), _FlagsUnionBase):
                 if isinstance(value, (bytes, bytearray)):
-                    getattr(self, item)._flags = unpack(value.ljust(context.bytes, b'\x00'))
+                    getattr(self, item)._flags = unpack(value.ljust(context.bytes, b"\x00"))
                 else:
                     getattr(self, item)._flags = value
             else:
-                object.__setattr__(self,item,value)
+                object.__setattr__(self, item, value)
         else:
             log.error("Unknown variable %r" % item)
 
     def __repr__(self):
-        structure=[]
+        structure = []
         for i in self.vars_:
             val = getattr(self, i)
             if isinstance(val, int):
                 structure.append(" %s: %#x" % (i, val))
             else:
                 structure.append(" %s: %s" % (i, val))
-        return "{"+ "\n".join(structure)+"}"
+        return "{" + "\n".join(structure) + "}"
 
     def __len__(self):
         return len(bytes(self))
 
     def __bytes__(self):
-        structure = b''
+        structure = b""
         for val in self.vars_:
             if isinstance(getattr(self, val), bytes):
-                structure += getattr(self, val).ljust(context.bytes, b'\x00')
-            else:
-                if self.length[val] > 0:
-                    structure += pack(int(getattr(self, val)), self.length[val]*8)
+                structure += getattr(self, val).ljust(context.bytes, b"\x00")
+            elif self.length[val] > 0:
+                structure += pack(int(getattr(self, val)), self.length[val] * 8)
         return structure
 
-    def struntil(self,v):
+    def struntil(self, v):
         r"""
         Payload for stuff till 'v' where 'v' is a structure member. This payload includes 'v' as well.
 
@@ -330,51 +333,51 @@ class FileStructure(object):
             b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
         """
         if v not in self.vars_:
-            return b''
-        structure = b''
+            return b""
+        structure = b""
         for val in self.vars_:
             if isinstance(getattr(self, val), bytes):
-                structure += getattr(self, val).ljust(context.bytes, b'\x00')
+                structure += getattr(self, val).ljust(context.bytes, b"\x00")
             else:
-                structure += pack(int(getattr(self, val)), self.length[val]*8)
+                structure += pack(int(getattr(self, val)), self.length[val] * 8)
             if val == v:
                 break
         return structure[:-1]
 
-    def setdefault(self,null):
-            self.flags=_IOFileFlags()
-            self._IO_read_ptr=0
-            self._IO_read_end=0
-            self._IO_read_base=0
-            self._IO_write_base=0
-            self._IO_write_ptr=0
-            self._IO_write_end=0
-            self._IO_buf_base=0
-            self._IO_buf_end=0
-            self._IO_save_base=0
-            self._IO_backup_base=0
-            self._IO_save_end=0
-            self.markers=0
-            self.chain=0
-            self.fileno=0
-            self._flags2=_IOFileFlags2()
-            self._old_offset=0
-            self._cur_column=0
-            self._vtable_offset=0
-            self._shortbuf=0
-            self.unknown1=0
-            self._lock=null
-            self._offset=0xffffffffffffffff
-            self._codecvt=0
-            self._wide_data=null
-            self._freeres_list=0
-            self._freeres_buf=0
-            self._pad5=0
-            self._mode=0
-            self._unused2=0
-            self.vtable=0
+    def setdefault(self, null):
+        self.flags = _IOFileFlags()
+        self._IO_read_ptr = 0
+        self._IO_read_end = 0
+        self._IO_read_base = 0
+        self._IO_write_base = 0
+        self._IO_write_ptr = 0
+        self._IO_write_end = 0
+        self._IO_buf_base = 0
+        self._IO_buf_end = 0
+        self._IO_save_base = 0
+        self._IO_backup_base = 0
+        self._IO_save_end = 0
+        self.markers = 0
+        self.chain = 0
+        self.fileno = 0
+        self._flags2 = _IOFileFlags2()
+        self._old_offset = 0
+        self._cur_column = 0
+        self._vtable_offset = 0
+        self._shortbuf = 0
+        self.unknown1 = 0
+        self._lock = null
+        self._offset = 0xFFFFFFFFFFFFFFFF
+        self._codecvt = 0
+        self._wide_data = null
+        self._freeres_list = 0
+        self._freeres_buf = 0
+        self._pad5 = 0
+        self._mode = 0
+        self._unused2 = 0
+        self.vtable = 0
 
-    def write(self,addr=0,size=0):
+    def write(self, addr=0, size=0):
         r"""
         Writing data out from arbitrary memory address.
 
@@ -397,12 +400,12 @@ class FileStructure(object):
         self.flags._IO_NO_WRITES = 0
         self.flags._IO_CURRENTLY_PUTTING = 1
         self._IO_write_base = addr
-        self._IO_write_ptr = addr+size
+        self._IO_write_ptr = addr + size
         self._IO_read_end = addr
         self.fileno = 1
-        return self.struntil('fileno')
+        return self.struntil("fileno")
 
-    def read(self,addr=0,size=0):
+    def read(self, addr=0, size=0):
         r"""
         Reading data into arbitrary memory location.
 
@@ -426,11 +429,11 @@ class FileStructure(object):
         self._IO_read_base = 0
         self._IO_read_ptr = 0
         self._IO_buf_base = addr
-        self._IO_buf_end = addr+size
+        self._IO_buf_end = addr + size
         self.fileno = 0
-        return self.struntil('fileno')
+        return self.struntil("fileno")
 
-    def orange(self,io_list_all,vtable):
+    def orange(self, io_list_all, vtable):
         r"""
         Perform a House of Orange (https://github.com/shellphish/how2heap/blob/master/glibc_2.23/house_of_orange.c), provided you have libc leaks.
 
@@ -451,13 +454,13 @@ class FileStructure(object):
             b'/bin/sh\x00a\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xfd\xef\xce\xfa\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\xef\xbe\xad\xde\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\xef\xbe\xad\xde\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xbe\xba\xfe\xca\x00\x00\x00\x00'
         """
         if context.bits == 64:
-            self.flags = b'/bin/sh\x00'
+            self.flags = b"/bin/sh\x00"
             self._IO_read_ptr = 0x61
-            self._IO_read_base = io_list_all-0x10
+            self._IO_read_base = io_list_all - 0x10
         elif context.bits == 32:
-            self.flags = b'sh\x00'
+            self.flags = b"sh\x00"
             self._IO_read_ptr = 0x121
-            self._IO_read_base = io_list_all-0x8
+            self._IO_read_base = io_list_all - 0x8
         self._IO_write_base = 0
         self._IO_write_ptr = 1
         self.vtable = vtable

@@ -1,13 +1,12 @@
 """
 Fetch a LIBC binary based on some heuristics.
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import os
-import time
-import tempfile
 import struct
+import time
 
 from pwnlib.context import context
 from pwnlib.elf import ELF
@@ -15,10 +14,8 @@ from pwnlib.filesystem.path import Path
 from pwnlib.log import getLogger
 from pwnlib.tubes.process import process
 from pwnlib.util.fiddling import enhex, unhex
-from pwnlib.util.hashes import sha1filehex, sha256filehex, md5filehex
-from pwnlib.util.misc import read
-from pwnlib.util.misc import which
-from pwnlib.util.misc import write
+from pwnlib.util.hashes import md5filehex, sha1filehex, sha256filehex
+from pwnlib.util.misc import read, which, write
 from pwnlib.util.web import wget
 
 log = getLogger(__name__)
@@ -44,33 +41,30 @@ def _turbofast_extract_build_id(path):
     # search NT_GNU_BUILD_ID and b"GNU\x00" (type+name)
     idx = data.find(unhex("03000000474e5500"))
     if idx == -1:
-        return enhex(ELF(path, checksec=False).buildid or b'')
-    descsz, = struct.unpack("<L", data[idx-4: idx])
-    return enhex(data[idx+8: idx+8+descsz])
+        return enhex(ELF(path, checksec=False).buildid or b"")
+    (descsz,) = struct.unpack("<L", data[idx - 4 : idx])
+    return enhex(data[idx + 8 : idx + 8 + descsz])
 
 
 TYPES = {
-    'libs_id': None,
-    'build_id': _turbofast_extract_build_id,
-    'sha1': sha1filehex,
-    'sha256': sha256filehex,
-    'md5': md5filehex,
+    "libs_id": None,
+    "build_id": _turbofast_extract_build_id,
+    "sha1": sha1filehex,
+    "sha256": sha256filehex,
+    "md5": md5filehex,
 }
 
 # mapping for search result (same as libc.rip)
-MAP_TYPES = {
-    'libs_id': 'id',
-    'build_id': 'buildid'
-}
+MAP_TYPES = {"libs_id": "id", "build_id": "buildid"}
 
 DEBUGINFOD_SERVERS = [
-    'https://debuginfod.ubuntu.com/',
-    'https://debuginfod.debian.net/',
-    'https://debuginfod.elfutils.org/',
+    "https://debuginfod.ubuntu.com/",
+    "https://debuginfod.debian.net/",
+    "https://debuginfod.elfutils.org/",
 ]
 
-if 'DEBUGINFOD_URLS' in os.environ:
-    urls = os.environ['DEBUGINFOD_URLS'].split(' ')
+if "DEBUGINFOD_URLS" in os.environ:
+    urls = os.environ["DEBUGINFOD_URLS"].split(" ")
     DEBUGINFOD_SERVERS = urls + DEBUGINFOD_SERVERS
 
 # Allow to override url with a caching proxy in CI
@@ -78,45 +72,48 @@ LIBC_RIP_URL = os.environ.get("PWN_LIBCRIP_URL", "https://libc.rip").rstrip("/")
 GITLAB_LIBCDB_URL = os.environ.get("PWN_GITLAB_LIBCDB_URL", "https://gitlab.com").rstrip("/")
 
 # Retry failed lookups after some time
-NEGATIVE_CACHE_EXPIRY = 60 * 60 * 24 * 7 # 1 week
+NEGATIVE_CACHE_EXPIRY = 60 * 60 * 24 * 7  # 1 week
+
 
 # https://gitlab.com/libcdb/libcdb wasn't updated after 2019,
 # but still is a massive database of older libc binaries.
 def provider_libcdb(hex_encoded_id, search_type):
-    if search_type == 'libs_id':
+    if search_type == "libs_id":
         return None
 
     # Deferred import because it's slow
-    import requests
     import urllib.parse
 
-    # Build the URL using the requested hash type
-    url_base = "{}/libcdb/libcdb/raw/master/hashes/{}/".format(GITLAB_LIBCDB_URL, search_type)
-    url      = urllib.parse.urljoin(url_base, hex_encoded_id)
+    import requests
 
-    data     = b""
+    # Build the URL using the requested hash type
+    url_base = f"{GITLAB_LIBCDB_URL}/libcdb/libcdb/raw/master/hashes/{search_type}/"
+    url = urllib.parse.urljoin(url_base, hex_encoded_id)
+
+    data = b""
     log.debug("Downloading data from LibcDB: %s", url)
     try:
-        while not data.startswith(b'\x7fELF'):
+        while not data.startswith(b"\x7fELF"):
             data = wget(url, timeout=20)
 
             if not data:
                 log.warn_once("Could not fetch libc for %s %s from libcdb", search_type, hex_encoded_id)
                 break
-            
+
             # GitLab serves up symlinks with
-            if data.startswith(b'..'):
-                url = os.path.dirname(url) + '/'
-                url = urllib.parse.urljoin(url.encode('utf-8'), data)
+            if data.startswith(b".."):
+                url = os.path.dirname(url) + "/"
+                url = urllib.parse.urljoin(url.encode("utf-8"), data)
     except requests.RequestException as e:
         log.warn_once("Failed to fetch libc for %s %s from libcdb: %s", search_type, hex_encoded_id, e)
     return data
+
 
 def query_libc_rip(params):
     # Deferred import because it's slow
     import requests
 
-    url = "{}/api/find".format(LIBC_RIP_URL)
+    url = f"{LIBC_RIP_URL}/api/find"
     try:
         result = requests.post(url, json=params, timeout=20)
         result.raise_for_status()
@@ -127,6 +124,7 @@ def query_libc_rip(params):
     except requests.RequestException as e:
         log.warn_once("Failed to fetch libc info from libc.rip: %s", e)
         return None
+
 
 # https://libc.rip/
 def provider_libc_rip(search_target, search_type):
@@ -146,7 +144,7 @@ def provider_libc_rip(search_target, search_type):
         log.debug("Received multiple matches. Choosing the first match and discarding the others.")
         log.debug("%r", libc_match)
 
-    url = libc_match[0]['download_url']
+    url = libc_match[0]["download_url"]
     log.debug("Downloading data from libc.rip: %s", url)
     url = url.replace("https://libc.rip", LIBC_RIP_URL)
     data = wget(url, timeout=20)
@@ -156,21 +154,23 @@ def provider_libc_rip(search_target, search_type):
         return None
     return data
 
+
 # Check if the local system libc matches the requested hash.
 def provider_local_system(hex_encoded_id, search_type):
-    if search_type == 'libs_id':
+    if search_type == "libs_id":
         return None
-    shell_path = os.environ.get('SHELL', None) or '/bin/sh'
+    shell_path = os.environ.get("SHELL", None) or "/bin/sh"
     if not os.path.exists(shell_path):
-        log.debug('Shell path %r does not exist. Skipping local system libc matching.', shell_path)
+        log.debug("Shell path %r does not exist. Skipping local system libc matching.", shell_path)
         return None
     local_libc = ELF(shell_path, checksec=False).libc
     if not local_libc:
-        log.debug('Cannot lookup libc from shell %r. Skipping local system libc matching.', shell_path)
+        log.debug("Cannot lookup libc from shell %r. Skipping local system libc matching.", shell_path)
         return None
     if TYPES[search_type](local_libc.path) == hex_encoded_id:
         return local_libc.data
     return None
+
 
 # Offline search https://github.com/niklasb/libc-database for hash type
 def provider_local_database(search_target, search_type):
@@ -182,7 +182,7 @@ def provider_local_database(search_target, search_type):
         return None
 
     # Handle the specific search type 'libs_id'
-    if search_type == 'libs_id':
+    if search_type == "libs_id":
         libc_list = list(localdb.rglob("%s.so" % search_target))
         if len(libc_list) == 0:
             return None
@@ -194,6 +194,7 @@ def provider_local_database(search_target, search_type):
             return read(libc_path)
 
     return None
+
 
 def query_local_database(params):
     if not context.local_libcdb or not params.get("symbols"):
@@ -214,10 +215,10 @@ def query_local_database(params):
         matched = 0
         for name, addr in query_syms.items():
             if isinstance(addr, str):
-                addr = int(addr, 16) 
+                addr = int(addr, 16)
 
             # Compare last 12 bits
-            if libc_syms.get(name) and (libc_syms.get(name) & 0xfff) == (addr & 0xfff):
+            if libc_syms.get(name) and (libc_syms.get(name) & 0xFFF) == (addr & 0xFFF):
                 matched += 1
             else:
                 # aborting this loop once there was a mismatch.
@@ -232,17 +233,19 @@ def query_local_database(params):
 
     return res
 
+
 PROVIDERS = {
     "offline": [provider_local_system, provider_local_database],
-    "online": [provider_libcdb, provider_libc_rip]
+    "online": [provider_libcdb, provider_libc_rip],
 }
 
-def search_by_hash(search_target, search_type='build_id', unstrip=True, offline_only=False):
+
+def search_by_hash(search_target, search_type="build_id", unstrip=True, offline_only=False):
     """search_by_hash(str, str, bool, bool) -> str
     Arguments:
         search_target(str):
             Use for searching the libc. This could be a hex encoded ID (`hex_encoded_id`) or a library
-            name (`libs_id`). Depending on `search_type`, this can represent different types of encoded 
+            name (`libs_id`). Depending on `search_type`, this can represent different types of encoded
             values or names.
         search_type(str):
             The type of the search to be performed, it should be one of the keys in the `TYPES` dictionary.
@@ -258,12 +261,12 @@ def search_by_hash(search_target, search_type='build_id', unstrip=True, offline_
     assert search_type in TYPES, search_type
 
     # Ensure that the libcdb cache directory exists
-    cache, cache_valid = _check_elf_cache('libcdb', search_target, search_type)
+    cache, cache_valid = _check_elf_cache("libcdb", search_target, search_type)
     if cache_valid:
         if unstrip:
             unstrip_libc(cache)
         return cache
-    
+
     # We searched for this buildid before, but didn't find anything.
     if cache is None:
         return None
@@ -275,17 +278,17 @@ def search_by_hash(search_target, search_type='build_id', unstrip=True, offline_
     # Run through all available libc database providers to see if we have a match.
     for provider in providers:
         data = provider(search_target, search_type)
-        if data and data.startswith(b'\x7FELF'):
+        if data and data.startswith(b"\x7fELF"):
             break
 
     if not data:
         log.warn_once("Could not find libc for %s %s anywhere", search_type, search_target)
 
     # Save whatever we got to the cache
-    write(cache, data or b'')
+    write(cache, data or b"")
 
     # Return ``None`` if we did not get a valid ELF file
-    if not data or not data.startswith(b'\x7FELF'):
+    if not data or not data.startswith(b"\x7fELF"):
         return None
 
     # Try to find debug info for this libc.
@@ -293,6 +296,7 @@ def search_by_hash(search_target, search_type='build_id', unstrip=True, offline_
         unstrip_libc(cache)
 
     return cache
+
 
 def _check_elf_cache(cache_type, search_target, search_type):
     """
@@ -318,11 +322,11 @@ def _check_elf_cache(cache_type, search_target, search_type):
 
     if not os.path.exists(cache):
         return cache, False
-    
+
     log.debug("Found existing cached ELF at %r", cache)
 
     data = read(cache)
-    if not data.startswith(b'\x7FELF'):
+    if not data.startswith(b"\x7fELF"):
         # Retry failed lookups after some time
         if time.time() > os.path.getmtime(cache) + NEGATIVE_CACHE_EXPIRY:
             return cache, False
@@ -331,6 +335,7 @@ def _check_elf_cache(cache_type, search_target, search_type):
 
     log.info_once("Using cached data from %r", cache)
     return cache, True
+
 
 def unstrip_libc(filename):
     """
@@ -363,29 +368,30 @@ def unstrip_libc(filename):
         >>> 'main_arena' in ELF(filename).symbols
         True
     """
-    if not which('eu-unstrip'):
+    if not which("eu-unstrip"):
         log.warn_once('Couldn\'t find "eu-unstrip" in PATH. Install elfutils first.')
         return False
 
     libc = ELF(filename, checksec=False)
     if not libc.buildid:
-        log.warn_once('Given libc does not have a buildid. Cannot look for debuginfo to unstrip.')
+        log.warn_once("Given libc does not have a buildid. Cannot look for debuginfo to unstrip.")
         return False
 
     if libc.debuginfo:
-        log.debug('Given libc already contains debug information. Skipping unstrip.')
+        log.debug("Given libc already contains debug information. Skipping unstrip.")
         return True
 
-    log.debug('Trying debuginfod servers: %r', DEBUGINFOD_SERVERS)
+    log.debug("Trying debuginfod servers: %r", DEBUGINFOD_SERVERS)
 
     # Deferred import because it's slow
-    import requests
     import urllib.parse
+
+    import requests
 
     hex_encoded_id = enhex(libc.buildid)
 
     # Check if we tried this buildid before.
-    cache, cache_valid = _check_elf_cache('libcdb_dbg', hex_encoded_id, 'build_id')
+    cache, cache_valid = _check_elf_cache("libcdb_dbg", hex_encoded_id, "build_id")
     if not cache_valid:
         # Cached negative result so we don't look for missing debug info everytime.
         if cache is None:
@@ -393,45 +399,54 @@ def unstrip_libc(filename):
         else:
             for server_url in DEBUGINFOD_SERVERS:
                 # Try to find separate debuginfo.
-                url  = '/buildid/{}/debuginfo'.format(hex_encoded_id)
-                url  = urllib.parse.urljoin(server_url, url)
+                url = f"/buildid/{hex_encoded_id}/debuginfo"
+                url = urllib.parse.urljoin(server_url, url)
                 data = b""
                 log.debug("Downloading data from debuginfod: %s", url)
                 try:
                     data = wget(url, timeout=20)
 
                     # Try next server if we didn't get a valid ELF file
-                    if not data or not data.startswith(b'\x7FELF'):
-                        log.warn_once("Could not fetch libc debuginfo for build_id %s from %s", hex_encoded_id, server_url)
+                    if not data or not data.startswith(b"\x7fELF"):
+                        log.warn_once(
+                            "Could not fetch libc debuginfo for build_id %s from %s", hex_encoded_id, server_url
+                        )
                         continue
                     break
                 except requests.RequestException as e:
-                    log.warn_once("Failed to fetch libc debuginfo for build_id %s from %s: %s", hex_encoded_id, server_url, e)
+                    log.warn_once(
+                        "Failed to fetch libc debuginfo for build_id %s from %s: %s", hex_encoded_id, server_url, e
+                    )
             else:
-                write(cache, data or b'')
-                log.warn_once('Couldn\'t find debug info for libc with build_id %s on any debuginfod server.', enhex(libc.buildid))
+                write(cache, data or b"")
+                log.warn_once(
+                    "Couldn't find debug info for libc with build_id %s on any debuginfod server.", enhex(libc.buildid)
+                )
                 return False
-            
+
             # Save whatever we got to the cache
-            write(cache, data or b'')
+            write(cache, data or b"")
 
     # Add debug info to given libc binary inplace.
-    p = process(['eu-unstrip', '-o', filename, filename, cache])
+    p = process(["eu-unstrip", "-o", filename, filename, cache])
     output = p.recvall()
     p.close()
 
     if output:
-        log.error('Failed to unstrip libc binary: %r', output)
+        log.error("Failed to unstrip libc binary: %r", output)
         return False
 
     return True
 
+
 def _extract_tarfile(cache_dir, data_filename, tarball):
-    from io import BytesIO
     import tarfile
+    from io import BytesIO
+
     # Handle zstandard compression, since tarfile only supports gz, bz2, and xz.
-    if data_filename.endswith('.zst') or data_filename.endswith('.zstd'):
+    if data_filename.endswith(".zst") or data_filename.endswith(".zstd"):
         import zstandard
+
         dctx = zstandard.ZstdDecompressor()
         decompressed_tar = BytesIO()
         dctx.copy_stream(tarball, decompressed_tar)
@@ -447,11 +462,11 @@ def _extract_tarfile(cache_dir, data_filename, tarball):
             if not member.isfile():
                 continue
             libc_name = os.path.basename(member.name)
-            if libc_name == 'libc.so.6' or (libc_name.startswith('libc') and libc_name.endswith('.so')):
+            if libc_name == "libc.so.6" or (libc_name.startswith("libc") and libc_name.endswith(".so")):
                 lib_dir = os.path.dirname(member.name)
                 break
         else:
-            log.error('Couldn\'t find library folder containing the libc in the archive.')
+            log.error("Couldn't find library folder containing the libc in the archive.")
 
         # Extract everything in the library folder
         for member in tar_file.getmembers():
@@ -470,38 +485,46 @@ def _extract_tarfile(cache_dir, data_filename, tarball):
 
         return os.path.join(cache_dir, libc_name)
 
+
 def _extract_debfile(cache_dir, package_filename, package):
     # Extract data.tar in the .deb archive.
-    import unix_ar
     from io import BytesIO
+
+    import unix_ar
+
     ar_file = unix_ar.open(BytesIO(package))
     try:
-        data_filename = next(filter(lambda f: f.name.startswith(b'data.tar'), ar_file.infolist())).name.decode()
+        data_filename = next(filter(lambda f: f.name.startswith(b"data.tar"), ar_file.infolist())).name.decode()
         tarball = ar_file.open(data_filename)
         return _extract_tarfile(cache_dir, data_filename, tarball)
     finally:
         ar_file.close()
 
+
 def _extract_pkgfile(cache_dir, package_filename, package):
     from io import BytesIO
+
     return _extract_tarfile(cache_dir, package_filename, BytesIO(package))
+
 
 def _find_libc_package_lib_url(libc):
     # Check https://libc.rip for the libc package
-    libc_match = query_libc_rip({'buildid': enhex(libc.buildid)})
+    libc_match = query_libc_rip({"buildid": enhex(libc.buildid)})
     if libc_match is not None:
         for match in libc_match:
             # Allow to override url with a caching proxy in CI
-            ubuntu_archive_url = os.environ.get('PWN_UBUNTU_ARCHIVE_URL', 'http://archive.ubuntu.com').rstrip('/')
-            yield match['libs_url'].replace('http://archive.ubuntu.com', ubuntu_archive_url)
-    
+            ubuntu_archive_url = os.environ.get("PWN_UBUNTU_ARCHIVE_URL", "http://archive.ubuntu.com").rstrip("/")
+            yield match["libs_url"].replace("http://archive.ubuntu.com", ubuntu_archive_url)
+
     # Check launchpad.net if it's an Ubuntu libc
     # GNU C Library (Ubuntu GLIBC 2.36-0ubuntu4)
     import re
-    version = re.search(br'GNU C Library \(Ubuntu E?GLIBC ([^\)]+)\)', libc.data)
+
+    version = re.search(rb"GNU C Library \(Ubuntu E?GLIBC ([^\)]+)\)", libc.data)
     if version is not None:
         libc_version = version.group(1).decode()
-        yield 'https://launchpad.net/ubuntu/+archive/primary/+files/libc6_{}_{}.deb'.format(libc_version, libc.arch)
+        yield f"https://launchpad.net/ubuntu/+archive/primary/+files/libc6_{libc_version}_{libc.arch}.deb"
+
 
 def download_libraries(libc_path, unstrip=True):
     """download_libraries(str, bool) -> str
@@ -538,23 +561,23 @@ def download_libraries(libc_path, unstrip=True):
 
     libc = ELF(libc_path, checksec=False)
     if not libc.buildid:
-        log.warn_once('Given libc does not have a buildid.')
+        log.warn_once("Given libc does not have a buildid.")
         return None
-    
+
     # Handle caching and don't redownload if it already exists.
-    cache_dir = os.path.join(context.cache_dir, 'libcdb_libs')
+    cache_dir = os.path.join(context.cache_dir, "libcdb_libs")
     if not os.path.isdir(cache_dir):
         os.makedirs(cache_dir)
-    
+
     cache_dir = os.path.join(cache_dir, enhex(libc.buildid))
     if os.path.exists(cache_dir):
         return cache_dir
 
     for package_url in _find_libc_package_lib_url(libc):
         extension_handlers = {
-            '.deb': _extract_debfile,
-            '.pkg.tar.xz': _extract_pkgfile,
-            '.pkg.tar.zst': _extract_pkgfile,
+            ".deb": _extract_debfile,
+            ".pkg.tar.xz": _extract_pkgfile,
+            ".pkg.tar.zst": _extract_pkgfile,
         }
 
         package_filename = os.path.basename(package_url)
@@ -562,7 +585,7 @@ def download_libraries(libc_path, unstrip=True):
             if package_filename.endswith(extension):
                 break
         else:
-            log.failure('Cannot handle %s (%s)', package_filename, package_url)
+            log.failure("Cannot handle %s (%s)", package_filename, package_url)
             continue
 
         # Download the package
@@ -579,7 +602,7 @@ def download_libraries(libc_path, unstrip=True):
             libc_path = handler(cache_dir, package_filename, package)
         except Exception as e:
             os.removedirs(cache_dir)
-            log.failure('Failed to extract %s: %s', package_filename, e)
+            log.failure("Failed to extract %s: %s", package_filename, e)
             continue
         # Unstrip the libc binary
         try:
@@ -590,27 +613,38 @@ def download_libraries(libc_path, unstrip=True):
 
         return cache_dir
 
-    log.warn_once('Failed to find matching libraries for provided libc.')
+    log.warn_once("Failed to find matching libraries for provided libc.")
     return None
+
 
 def _handle_multiple_matching_libcs(matching_libcs):
     from pwnlib.term import text
     from pwnlib.ui import options
-    log.info('Multiple matching libc libraries for requested symbols:')
-    for idx, libc in enumerate(matching_libcs):
-        log.info('%d. %s', idx+1, text.red(libc['id']))
-        log.indented('\t%-20s %s', text.green('BuildID:'), libc['buildid'])
-        log.indented('\t%-20s %s', text.green('MD5:'), libc['md5'])
-        log.indented('\t%-20s %s', text.green('SHA1:'), libc['sha1'])
-        log.indented('\t%-20s %s', text.green('SHA256:'), libc['sha256'])
-        log.indented('\t%s', text.green('Symbols:'))
-        for symbol, address in libc['symbols'].items():
-            log.indented('\t%25s = %s', symbol, address)
 
-    selected_index = options("Select the libc version to use:", [libc['id'] for libc in matching_libcs])
+    log.info("Multiple matching libc libraries for requested symbols:")
+    for idx, libc in enumerate(matching_libcs):
+        log.info("%d. %s", idx + 1, text.red(libc["id"]))
+        log.indented("\t%-20s %s", text.green("BuildID:"), libc["buildid"])
+        log.indented("\t%-20s %s", text.green("MD5:"), libc["md5"])
+        log.indented("\t%-20s %s", text.green("SHA1:"), libc["sha1"])
+        log.indented("\t%-20s %s", text.green("SHA256:"), libc["sha256"])
+        log.indented("\t%s", text.green("Symbols:"))
+        for symbol, address in libc["symbols"].items():
+            log.indented("\t%25s = %s", symbol, address)
+
+    selected_index = options("Select the libc version to use:", [libc["id"] for libc in matching_libcs])
     return matching_libcs[selected_index]
 
-def search_by_symbol_offsets(symbols, select_index=None, unstrip=True, offline_only=False, search_type='build_id', return_as_list=False, return_raw=False):
+
+def search_by_symbol_offsets(
+    symbols,
+    select_index=None,
+    unstrip=True,
+    offline_only=False,
+    search_type="build_id",
+    return_as_list=False,
+    return_raw=False,
+):
     """
     Lookup possible matching libc versions based on leaked function addresses.
 
@@ -663,8 +697,8 @@ def search_by_symbol_offsets(symbols, select_index=None, unstrip=True, offline_o
         if isinstance(address, int):
             symbols[symbol] = hex(address)
 
-    params = {'symbols': symbols}
-    log.debug('Request: %s', params)
+    params = {"symbols": symbols}
+    log.debug("Request: %s", params)
 
     offline_matching = query_local_database(params)
     online_matching = query_libc_rip(params) if not offline_only else None
@@ -677,12 +711,12 @@ def search_by_symbol_offsets(symbols, select_index=None, unstrip=True, offline_o
     # Aggregate and deduplicate matches from both sources
     matching_libcs = {}
     for libc in offline_matching + online_matching:
-        if libc['id'] not in matching_libcs:
-            matching_libcs[libc['id']] = libc
+        if libc["id"] not in matching_libcs:
+            matching_libcs[libc["id"]] = libc
 
-    log.debug('Offline search result: %s', offline_matching)
+    log.debug("Offline search result: %s", offline_matching)
     if not offline_only:
-        log.debug('Online search result: %s', online_matching)
+        log.debug("Online search result: %s", online_matching)
 
     # Check if no matches are found
     if len(matching_libcs) == 0:
@@ -692,7 +726,7 @@ def search_by_symbol_offsets(symbols, select_index=None, unstrip=True, offline_o
     matching_list = list(matching_libcs.values())
 
     if return_as_list:
-        return [libc['buildid'] for libc in matching_list]
+        return [libc["buildid"] for libc in matching_list]
 
     if return_raw:
         return matching_list
@@ -701,19 +735,29 @@ def search_by_symbol_offsets(symbols, select_index=None, unstrip=True, offline_o
 
     # If there's only one match, return it directly
     if len(matching_list) == 1:
-        return search_by_hash(matching_list[0][mapped_type], search_type=search_type, unstrip=unstrip, offline_only=offline_only)
+        return search_by_hash(
+            matching_list[0][mapped_type], search_type=search_type, unstrip=unstrip, offline_only=offline_only
+        )
 
     # If a specific index is provided, validate it and return the selected libc
     if select_index is not None:
         if select_index > 0 and select_index <= len(matching_list):
-            return search_by_hash(matching_list[select_index - 1][mapped_type], search_type=search_type, unstrip=unstrip, offline_only=offline_only)
+            return search_by_hash(
+                matching_list[select_index - 1][mapped_type],
+                search_type=search_type,
+                unstrip=unstrip,
+                offline_only=offline_only,
+            )
         else:
-            log.error('Invalid selected libc index. %d is not in the range of 1-%d.', select_index, len(matching_list))
+            log.error("Invalid selected libc index. %d is not in the range of 1-%d.", select_index, len(matching_list))
             return None
 
     # Handle multiple matches interactively if no index is specified
     selected_libc = _handle_multiple_matching_libcs(matching_list)
-    return search_by_hash(selected_libc[mapped_type], search_type=search_type, unstrip=unstrip, offline_only=offline_only)
+    return search_by_hash(
+        selected_libc[mapped_type], search_type=search_type, unstrip=unstrip, offline_only=offline_only
+    )
+
 
 def search_by_libs_id(libs_id, unstrip=True, offline_only=False):
     """
@@ -739,7 +783,8 @@ def search_by_libs_id(libs_id, unstrip=True, offline_only=False):
         >>> hex(ELF(filename).symbols.read)
         '0xeef40'
     """
-    return search_by_hash(libs_id, 'libs_id', unstrip, offline_only)
+    return search_by_hash(libs_id, "libs_id", unstrip, offline_only)
+
 
 def search_by_build_id(hex_encoded_id, unstrip=True, offline_only=False):
     """
@@ -768,7 +813,8 @@ def search_by_build_id(hex_encoded_id, unstrip=True, offline_only=False):
         >>> hex(ELF(filename).symbols.read)
         '0xeef40'
     """
-    return search_by_hash(hex_encoded_id, 'build_id', unstrip, offline_only)
+    return search_by_hash(hex_encoded_id, "build_id", unstrip, offline_only)
+
 
 def search_by_md5(hex_encoded_id, unstrip=True, offline_only=False):
     """
@@ -797,7 +843,8 @@ def search_by_md5(hex_encoded_id, unstrip=True, offline_only=False):
         >>> hex(ELF(filename).symbols.read)
         '0xeef40'
     """
-    return search_by_hash(hex_encoded_id, 'md5', unstrip, offline_only)
+    return search_by_hash(hex_encoded_id, "md5", unstrip, offline_only)
+
 
 def search_by_sha1(hex_encoded_id, unstrip=True, offline_only=False):
     """
@@ -826,7 +873,8 @@ def search_by_sha1(hex_encoded_id, unstrip=True, offline_only=False):
         >>> hex(ELF(filename).symbols.read)
         '0xeef40'
     """
-    return search_by_hash(hex_encoded_id, 'sha1', unstrip, offline_only)
+    return search_by_hash(hex_encoded_id, "sha1", unstrip, offline_only)
+
 
 def search_by_sha256(hex_encoded_id, unstrip=True, offline_only=False):
     """
@@ -855,7 +903,8 @@ def search_by_sha256(hex_encoded_id, unstrip=True, offline_only=False):
         >>> hex(ELF(filename).symbols.read)
         '0xeef40'
     """
-    return search_by_hash(hex_encoded_id, 'sha256', unstrip, offline_only)
+    return search_by_hash(hex_encoded_id, "sha256", unstrip, offline_only)
+
 
 def _parse_libc_symbol(path):
     """
@@ -864,16 +913,17 @@ def _parse_libc_symbol(path):
 
     syms = {}
 
-    with open(path, "r") as fd:
+    with open(path) as fd:
         for x in fd:
             name, addr = x.split(" ")
             syms[name] = int(addr, 16)
 
     return syms
 
+
 def _pack_libs_info(path, libs_id, libs_url, syms):
-    """ 
-    The JSON format is the same as libc.rip, and the "download_url" field is by default an empty string, 
+    """
+    The JSON format is the same as libc.rip, and the "download_url" field is by default an empty string,
     as it's not required in offline mode.
     """
 
@@ -885,7 +935,7 @@ def _pack_libs_info(path, libs_id, libs_url, syms):
 
     for search_type, hash_func in TYPES.items():
         # pass libs_id
-        if search_type == 'libs_id':
+        if search_type == "libs_id":
             continue
 
         # replace search_type
@@ -894,9 +944,7 @@ def _pack_libs_info(path, libs_id, libs_url, syms):
 
         info[search_type] = hash_func(path)
 
-    default_symbol_list = [
-        "__libc_start_main_ret", "dup2", "printf", "puts", "read", "system", "str_bin_sh"
-    ]
+    default_symbol_list = ["__libc_start_main_ret", "dup2", "printf", "puts", "read", "system", "str_bin_sh"]
 
     info["symbols"] = {}
     for name in default_symbol_list:
@@ -928,33 +976,43 @@ def get_build_id_offsets():
     # }
 
     return {
-    # $ check_arch 80386
-    #     181 Displaying notes found at file offset 0x00000174 with length 0x00000024:
-        'i386': [0x174, 0x1b4, 0x1d4],
-    # $ check_arch "ARM, EABI5"
-    #      69 Displaying notes found at file offset 0x00000174 with length 0x00000024:
-        'arm':  [0x174],
-        'thumb':  [0x174],
-    # $ check_arch "ARM aarch64"
-    #       1 Displaying notes found at file offset 0x00000238 with length 0x00000024:
-        'aarch64': [0x238],
-    # $ check_arch "x86-64"
-    #       6 Displaying notes found at file offset 0x00000174 with length 0x00000024:
-    #      82 Displaying notes found at file offset 0x00000270 with length 0x00000024:
-        'amd64': [0x270, 0x174, 0x2e0, 0x370],
-    # $ check_arch "PowerPC or cisco"
-    #      88 Displaying notes found at file offset 0x00000174 with length 0x00000024:
-        'powerpc': [0x174],
-    # $ check_arch "64-bit PowerPC"
-    #      30 Displaying notes found at file offset 0x00000238 with length 0x00000024:
-        'powerpc64': [0x238],
-    # $ check_arch "SPARC32"
-    #      32 Displaying notes found at file offset 0x00000174 with length 0x00000024:
-        'sparc': [0x174],
-    # $ check_arch "SPARC V9"
-    #      33 Displaying notes found at file offset 0x00000270 with length 0x00000024:
-        'sparc64': [0x270]
+        # $ check_arch 80386
+        #     181 Displaying notes found at file offset 0x00000174 with length 0x00000024:
+        "i386": [0x174, 0x1B4, 0x1D4],
+        # $ check_arch "ARM, EABI5"
+        #      69 Displaying notes found at file offset 0x00000174 with length 0x00000024:
+        "arm": [0x174],
+        "thumb": [0x174],
+        # $ check_arch "ARM aarch64"
+        #       1 Displaying notes found at file offset 0x00000238 with length 0x00000024:
+        "aarch64": [0x238],
+        # $ check_arch "x86-64"
+        #       6 Displaying notes found at file offset 0x00000174 with length 0x00000024:
+        #      82 Displaying notes found at file offset 0x00000270 with length 0x00000024:
+        "amd64": [0x270, 0x174, 0x2E0, 0x370],
+        # $ check_arch "PowerPC or cisco"
+        #      88 Displaying notes found at file offset 0x00000174 with length 0x00000024:
+        "powerpc": [0x174],
+        # $ check_arch "64-bit PowerPC"
+        #      30 Displaying notes found at file offset 0x00000238 with length 0x00000024:
+        "powerpc64": [0x238],
+        # $ check_arch "SPARC32"
+        #      32 Displaying notes found at file offset 0x00000174 with length 0x00000024:
+        "sparc": [0x174],
+        # $ check_arch "SPARC V9"
+        #      33 Displaying notes found at file offset 0x00000270 with length 0x00000024:
+        "sparc64": [0x270],
     }.get(context.arch, [])
 
 
-__all__ = ['get_build_id_offsets', 'search_by_build_id', 'search_by_sha1', 'search_by_sha256', 'search_by_md5', 'search_by_libs_id', 'unstrip_libc', 'search_by_symbol_offsets', 'download_libraries']
+__all__ = [
+    "get_build_id_offsets",
+    "search_by_build_id",
+    "search_by_sha1",
+    "search_by_sha256",
+    "search_by_md5",
+    "search_by_libs_id",
+    "unstrip_libc",
+    "search_by_symbol_offsets",
+    "download_libraries",
+]

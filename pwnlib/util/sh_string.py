@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 r"""
 Routines here are for getting any NULL-terminated sequence of bytes evaluated
 intact by any shell.  This includes all variants of quotes, whitespace, and
@@ -238,39 +237,38 @@ and should therefore be compatible with ``dash``.
 .. _OpenBSD Man Pages: https://man.openbsd.org/sh#SHELL_GRAMMAR
 .. _BusyBox's Wikipedia page: https://en.wikipedia.org/wiki/BusyBox#Features
 """
-from __future__ import absolute_import
-from __future__ import division
+
+from __future__ import annotations
 
 import string
-import subprocess
 
 from pwnlib.context import context
 from pwnlib.log import getLogger
 from pwnlib.tubes.process import process
-from pwnlib.util import fiddling
-from pwnlib.util.misc import which, normalize_argv_env
+from pwnlib.util.misc import normalize_argv_env, which
 
 log = getLogger(__name__)
 
+
 def test_all():
-    test('a') ##
-    test('ab') ##
-    test('a b') ##
-    test(r"a\'b") ##
-    everything_1 = bytes(range(1,256))
+    test("a")  ##
+    test("ab")  ##
+    test("a b")  ##
+    test(r"a\'b")  ##
+    everything_1 = bytes(range(1, 256))
     for s in everything_1:
         test(s)
-        test(s*4)
-        test(s * 2 + b'X')
-        test(b'X' + s * 2)
-        test((s*2 + b'X') * 2)
-        test(s + b'X' + s)
-        test(s*2 + b'X' + s*2)
-        test(b'X' + s*2 + b'X')
+        test(s * 4)
+        test(s * 2 + b"X")
+        test(b"X" + s * 2)
+        test((s * 2 + b"X") * 2)
+        test(s + b"X" + s)
+        test(s * 2 + b"X" + s * 2)
+        test(b"X" + s * 2 + b"X")
     test(everything_1)
     test(everything_1 * 2)
     test(everything_1 * 4)
-    everything_2 = b''.join(bytes([c,c]) for c in range(1,256)) ##
+    everything_2 = b"".join(bytes([c, c]) for c in range(1, 256))  ##
     test(everything_2)
 
     test(randoms(1000, everything_1))
@@ -298,20 +296,20 @@ def test(original):
     if isinstance(input, str):
         input = input.encode()
 
-    cmdstr = b'/bin/echo %s' % input
+    cmdstr = b"/bin/echo %s" % input
 
     SUPPORTED_SHELLS = [
-        ['ash', '-c', cmdstr],
-        ['bash', '-c', cmdstr],
-        ['bash', '-o', 'posix', '-c', cmdstr],
-        ['ksh', '-c', cmdstr],
-        ['busybox', 'ash', '-c', cmdstr],
-        ['busybox', 'sh', '-c', cmdstr],
-        ['zsh', '-c', cmdstr],
-        ['posh', '-c', cmdstr],
-        ['dash', '-c', cmdstr],
-        ['mksh', '-c', cmdstr],
-        ['sh', '-c', cmdstr],
+        ["ash", "-c", cmdstr],
+        ["bash", "-c", cmdstr],
+        ["bash", "-o", "posix", "-c", cmdstr],
+        ["ksh", "-c", cmdstr],
+        ["busybox", "ash", "-c", cmdstr],
+        ["busybox", "sh", "-c", cmdstr],
+        ["zsh", "-c", cmdstr],
+        ["posh", "-c", cmdstr],
+        ["dash", "-c", cmdstr],
+        ["mksh", "-c", cmdstr],
+        ["sh", "-c", cmdstr],
         # ['adb', 'exec-out', cmdstr]
     ]
 
@@ -319,10 +317,10 @@ def test(original):
         binary = shell[0]
 
         if not which(binary):
-            log.warn_once('Shell %r is not available' % binary)
+            log.warn_once("Shell %r is not available" % binary)
             continue
 
-        progress = log.progress('%s: %r' % (binary, original))
+        progress = log.progress("%s: %r" % (binary, original))
 
         with context.quiet:
             with process(shell) as p:
@@ -334,33 +332,30 @@ def test(original):
         data = data[:-1]
 
         if data != original:
-            for i,(a,b) in enumerate(zip(data, original)):
+            for i, (a, b) in enumerate(zip(data, original)):
                 if a == b:
                     continue
-                log.error(('Shell %r failed\n' +
-                          'Expect %r\n' +
-                          'Sent   %r\n' +
-                          'Output %r\n' +
-                          'Mismatch @ %i: %r vs %r') \
-                        % (binary, original, input, data, i, a, b))
+                log.error(
+                    ("Shell %r failed\n" + "Expect %r\n" + "Sent   %r\n" + "Output %r\n" + "Mismatch @ %i: %r vs %r")
+                    % (binary, original, input, data, i, a, b)
+                )
 
         progress.success()
 
 
-
-SINGLE_QUOTE = "'" ##
-ESCAPED_SINGLE_QUOTE = r"\'" ##
+SINGLE_QUOTE = "'"  ##
+ESCAPED_SINGLE_QUOTE = r"\'"  ##
 
 ESCAPED = {
     # The single quote itself must be escaped, outside of single quotes.
-    "'": "\\'", ##
-
+    "'": "\\'",  ##
     # Slashes must themselves be escaped
     #
     # Additionally, some shells coalesce any number N>1 of '\' into
     # a single backslash literal.
     # '\\': '"\\\\\\\\"'
 }
+
 
 def sh_string(s):
     r"""Outputs a string in a format that will be understood by /bin/sh.
@@ -394,18 +389,18 @@ def sh_string(s):
     """
     orig_s = s
     if isinstance(s, (bytes, bytearray)):
-        s = s.decode('latin1')
-    if '\x00' in s: ##
+        s = s.decode("latin1")
+    if "\x00" in s:  ##
         log.error("sh_string(): Cannot create a null-byte")
 
     if not s:
-        quoted_string = "''" ##
+        quoted_string = "''"  ##
         if isinstance(orig_s, (bytes, bytearray)):
-            quoted_string = quoted_string.encode('latin1')
+            quoted_string = quoted_string.encode("latin1")
         return quoted_string
 
     chars = set(s)
-    very_good = set(string.ascii_letters + string.digits + "_+.,/-") ##
+    very_good = set(string.ascii_letters + string.digits + "_+.,/-")  ##
 
     # Alphanumeric can always just be used verbatim.
     if chars <= very_good:
@@ -413,21 +408,21 @@ def sh_string(s):
 
     # If there are no single-quotes, the entire thing can be single-quoted
     if not (chars & set(ESCAPED)):
-        quoted_string = "'%s'" % s ##
+        quoted_string = "'%s'" % s  ##
         if isinstance(orig_s, (bytes, bytearray)):
-            quoted_string = quoted_string.encode('latin1')
+            quoted_string = quoted_string.encode("latin1")
         return quoted_string
 
     # If there are single-quotes, we can single-quote around them, and simply
     # escape the single-quotes.
-    quoted_string = '' ##
+    quoted_string = ""  ##
     quoted = False
-    for char in s: ##
+    for char in s:  ##
         if char not in ESCAPED:
             if not quoted:
                 quoted_string += SINGLE_QUOTE
                 quoted = True
-            quoted_string += char ##
+            quoted_string += char  ##
         else:
             if quoted:
                 quoted = False
@@ -438,10 +433,11 @@ def sh_string(s):
         quoted_string += SINGLE_QUOTE
 
     if isinstance(orig_s, (bytes, bytearray)):
-        quoted_string = quoted_string.encode('latin1')
+        quoted_string = quoted_string.encode("latin1")
     return quoted_string
 
-def sh_prepare(variables, export = False):
+
+def sh_prepare(variables, export=False):
     r"""Outputs a posix compliant shell command that will put the data specified
     by the dictionary into the environment.
 
@@ -483,14 +479,15 @@ def sh_prepare(variables, export = False):
     """
 
     out = []
-    export = b'export ' if export else b''
+    export = b"export " if export else b""
 
     _, variables = normalize_argv_env([], variables, log)
 
     for k, v in variables:
-        out.append(b'%s%s=%s' % (export, k, sh_string(v)))
+        out.append(b"%s%s=%s" % (export, k, sh_string(v)))
 
-    return b';'.join(out)
+    return b";".join(out)
+
 
 def sh_command_with(f, *args):
     r"""sh_command_with(f, arg0, ..., argN) -> command
@@ -525,8 +522,8 @@ def sh_command_with(f, *args):
 
     for n in range(len(args)):
         args[n] = sh_string(args[n])
-    if hasattr(f, '__call__'):
+    if hasattr(f, "__call__"):
         out.append(f(*args))
     else:
         out.append(f % tuple(args))
-    return ';'.join(out)
+    return ";".join(out)
