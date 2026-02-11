@@ -53,6 +53,7 @@ from collections import defaultdict
 from glob import glob
 from os import environ
 from os import path
+from typing import NoReturn, TYPE_CHECKING
 
 from pwnlib import atexit
 from pwnlib import shellcraft
@@ -63,6 +64,9 @@ from pwnlib.util.hashes import sha1sumhex
 from pwnlib.util.packing import _encode
 from pwnlib.version import __version__
 
+if TYPE_CHECKING:
+    from pwnlib.context import ContextType
+
 log = getLogger(__name__)
 
 __all__ = ['asm', 'cpp', 'disasm', 'make_elf', 'make_elf_from_assembly']
@@ -70,7 +74,7 @@ __all__ = ['asm', 'cpp', 'disasm', 'make_elf', 'make_elf_from_assembly']
 _basedir = path.split(__file__)[0]
 _incdir  = path.join(_basedir, 'data', 'includes')
 
-def dpkg_search_for_binutils(arch, util):
+def dpkg_search_for_binutils(arch: str, util: str) -> list[str]:
     """Use dpkg to search for any available assemblers which will work.
 
     Returns:
@@ -88,7 +92,7 @@ def dpkg_search_for_binutils(arch, util):
     # binutils-arm-linux-gnueabihf: /usr/bin/arm-linux-gnueabihf-as
     # binutils-arm-linux-gnueabihf: /usr/x86_64-linux-gnu/arm-linux-gnueabihf/include/dis-asm.h
     # binutils-arm-linux-gnu: /usr/x86_64-linux-gnu/arm-linux-gnu/include/dis-asm.h
-    packages = []
+    packages: list[str] = []
 
     try:
         filename = 'bin/%s*linux*-%s' % (arch, util)
@@ -103,7 +107,7 @@ def dpkg_search_for_binutils(arch, util):
 
     return packages
 
-def print_binutils_instructions(util, context):
+def print_binutils_instructions(util: str, context: ContextType) -> NoReturn:
     """On failure to find a binutils utility, inform the user of a way
     they can get it easily.
 
@@ -140,7 +144,7 @@ Try installing binutils for this architecture:
 """.strip() % locals())
 
 
-def check_binutils_version(util):
+def check_binutils_version(util: str):
     if util_versions[util]:
         return util_versions[util]
     result = subprocess.check_output([util, '--version','/dev/null'],
@@ -155,7 +159,7 @@ def check_binutils_version(util):
 
 
 @LocalContext
-def which_binutils(util, check_version=False):
+def which_binutils(util: str, check_version: bool = False):
     """
     Finds a binutils in the PATH somewhere.
     Expects that the utility is prefixed with the architecture name.
@@ -297,7 +301,7 @@ def _assembler():
 
     return assembler
 
-def _linker():
+def _linker() -> list[str]:
     ld, _ = which_binutils('ld', check_version=True)
     bfd = ['--oformat=' + _bfdname()]
 
@@ -313,7 +317,7 @@ def _linker():
     return [ld] + bfd + [E] + arguments
 
 
-def _execstack(linker):
+def _execstack(linker) -> list[str]:
     ldflags = ['-z', 'execstack']
     version = util_versions[linker[0]]
     if version >= (2, 39):
@@ -332,7 +336,7 @@ def _objdump():
 
     return path
 
-def _include_header():
+def _include_header() -> str:
     os   = context.os
     arch = context.arch
     include = '%s/%s.h' % (os, arch)
@@ -344,7 +348,7 @@ def _include_header():
     return '#include <%s>\n' % include
 
 
-def _arch_header():
+def _arch_header() -> str:
     prefix  = ['.section .shellcode,"awx"',
                 '.global _start',
                 '.global __start',
@@ -425,7 +429,7 @@ def _bfdarch():
 
     return arch
 
-def _run(cmd, stdin = None):
+def _run(cmd, stdin = None) -> str:
     log.debug('%s', subprocess.list2cmdline(cmd))
     try:
         proc = subprocess.Popen(
@@ -457,7 +461,7 @@ def _run(cmd, stdin = None):
     return stdout
 
 @LocalContext
-def cpp(shellcode):
+def cpp(shellcode: str) -> str:
     r"""cpp(shellcode, ...) -> str
 
     Runs CPP over the given shellcode.
@@ -500,11 +504,11 @@ def cpp(shellcode):
 
 
 @LocalContext
-def make_elf_from_assembly(assembly,
-                           vma=None,
-                           extract=False,
-                           shared=False,
-                           strip=False,
+def make_elf_from_assembly(assembly: str,
+                           vma: int | None = None,
+                           extract: bool = False,
+                           shared: bool = False,
+                           strip: bool = False,
                            **kwargs):
     r"""make_elf_from_assembly(assembly, vma=None, extract=None, shared=False, strip=False, **kwargs) -> str
 
@@ -589,11 +593,11 @@ def make_elf_from_assembly(assembly,
     return result
 
 @LocalContext
-def make_elf(data,
-             vma=None,
-             strip=True,
-             extract=True,
-             shared=False):
+def make_elf(data: str,
+             vma: int | None = None,
+             strip: bool = True,
+             extract: bool = True,
+             shared: bool = False) -> str | bytes:
     r"""make_elf(data, vma=None, strip=True, extract=True, shared=False, **kwargs) -> str
 
     Builds an ELF file with the specified binary data as its executable code.
@@ -683,12 +687,12 @@ def make_elf(data,
 
 
 @LocalContext
-def make_macho_from_assembly(shellcode):
+def make_macho_from_assembly(shellcode) -> str:
     return make_macho(shellcode, is_shellcode=True)
 
 
 @LocalContext
-def make_macho(data, is_shellcode=False):
+def make_macho(data, is_shellcode=False) -> str:
     prefix = []
     if context.arch == 'amd64':
         prefix = [
@@ -744,7 +748,7 @@ def make_macho(data, is_shellcode=False):
 
 
 @LocalContext
-def asm(shellcode, vma = 0, extract = True, shared = False):
+def asm(shellcode: str, vma: int = 0, extract: bool = True, shared: bool = False) -> str | bytes:
     r"""asm(code, vma = 0, extract = True, shared = False, ...) -> str
 
     Runs :func:`cpp` over a given shellcode and then assembles it into bytes.
@@ -900,7 +904,7 @@ def asm(shellcode, vma = 0, extract = True, shared = False):
     return result
 
 @LocalContext
-def disasm(data, vma = 0, byte = True, offset = True, instructions = True):
+def disasm(data: str, vma: int = 0, byte: bool = True, offset: bool = True, instructions: bool = True) -> str:
     """disasm(data, ...) -> str
 
     Disassembles a bytestring into human readable assembler.

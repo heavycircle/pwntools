@@ -40,7 +40,7 @@ import os
 
 registered_configs = {}
 
-def register_config(section, function):
+def register_config(section, function) -> None:
     """Registers a configuration section.
 
     Arguments:

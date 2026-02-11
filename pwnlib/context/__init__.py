@@ -73,7 +73,7 @@ class _defaultdict(dict):
         ...
         KeyError: 'baz'
     """
-    def __init__(self, default=None):
+    def __init__(self, default=None) -> None:
         super(_defaultdict, self).__init__()
         if default is None:
             default = {}
@@ -156,7 +156,7 @@ class _Tls_DictStack(threading.local, _DictStack):
     pass
 
 
-def _validator(validator):
+def _validator(validator) -> property:
     """
     Validator that is tightly coupled to the implementation
     of the classes here.
@@ -481,7 +481,7 @@ class ContextType(object):
     def __dict__(self):
         return self.copy()
 
-    def update(self, *args, **kwargs):
+    def update(self, *args, **kwargs) -> None:
         """
         Convenience function, which is shorthand for setting multiple
         variables at once.

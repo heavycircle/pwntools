@@ -67,7 +67,7 @@ from pwnlib.util.packing import _need_bytes
 log    = getLogger(__name__)
 sizeof = ctypes.sizeof
 
-def sysv_hash(symbol):
+def sysv_hash(symbol) -> int:
     """sysv_hash(str) -> int
 
     Function used to generate SYSV-style hashes for strings.
@@ -81,7 +81,7 @@ def sysv_hash(symbol):
         h &= ~g
     return h & 0xffffffff
 
-def gnu_hash(s):
+def gnu_hash(s) -> int:
     """gnu_hash(str) -> int
 
     Function used to generated GNU-style hashes for strings.
@@ -146,7 +146,7 @@ class DynELF(object):
     .. _DT_PLTGOT: https://refspecs.linuxfoundation.org/ELF/zSeries/lzsabi0_zSeries/x2251.html
     '''
 
-    def __init__(self, leak, pointer=None, elf=None, libcdb=True):
+    def __init__(self, leak: MemLeak, pointer: int | None = None, elf=None, libcdb: bool = True) -> None:
         '''
         Instantiates an object which can resolve symbols in a running binary
         given a :class:`pwnlib.memleak.MemLeak` leaker and a pointer inside
@@ -215,7 +215,7 @@ class DynELF(object):
         return DynELF(leak, ptr).libbase
 
     @property
-    def elfclass(self):
+    def elfclass(self) -> int:
         """32 or 64"""
         if not self._elfclass:
             elfclass = self.leak.field(self.libbase, elf.Elf_eident.EI_CLASS)
@@ -224,7 +224,7 @@ class DynELF(object):
         return self._elfclass
 
     @property
-    def elftype(self):
+    def elftype(self) -> str:
         """e_type from the elf header. In practice the value will almost always
         be 'EXEC' or 'DYN'. If the value is architecture-specific (between
         ET_LOPROC and ET_HIPROC) or invalid, KeyError is raised.
@@ -352,7 +352,7 @@ class DynELF(object):
 
         return dynamic
 
-    def _find_dt_optimized(self, name):
+    def _find_dt_optimized(self, name: str):
         """
         Find an entry in the DYNAMIC array through an ELF
 
@@ -373,7 +373,7 @@ class DynELF(object):
         return None
 
 
-    def _find_dt(self, tag):
+    def _find_dt(self, tag: int):
         """
         Find an entry in the DYNAMIC array.
 
@@ -464,28 +464,28 @@ class DynELF(object):
             self.status(msg)
         return self._waitfor
 
-    def failure(self, msg):
+    def failure(self, msg) -> None:
         if not self._waitfor:
             log.failure(msg)
         else:
             self._waitfor.failure(msg)
             self._waitfor = None
 
-    def success(self, msg):
+    def success(self, msg) -> None:
         if not self._waitfor:
             log.success(msg)
         else:
             self._waitfor.success(msg)
             self._waitfor = None
 
-    def status(self, msg):
+    def status(self, msg) -> None:
         if not self._waitfor:
             log.info(msg)
         else:
             self._waitfor.status(msg)
 
     @property
-    def libc(self):
+    def libc(self) -> ELF | None:
         """libc(self) -> ELF
 
         Leak the Build ID of the remote libc.so, download the file,
@@ -622,7 +622,7 @@ class DynELF(object):
 
         return self._bases
 
-    def _dynamic_load_dynelf(self, libname):
+    def _dynamic_load_dynelf(self, libname: str):
         """_dynamic_load_dynelf(libname) -> DynELF
 
         Looks up information about a loaded library via the link map.

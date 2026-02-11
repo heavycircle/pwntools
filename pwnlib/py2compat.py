@@ -24,7 +24,7 @@ def py2_monkey_patch(module):
 
 # python3 -c 'import shutil,inspect; print(inspect.getsource(shutil.get_terminal_size))'
 @py2_monkey_patch(shutil)
-def get_terminal_size(fallback=(80, 24)):
+def get_terminal_size(fallback: tuple[int, int] = (80, 24)) -> os.terminal_size:
     """Get the size of the terminal window.
 
     For each of the two dimensions, the environment variable, COLUMNS
@@ -70,16 +70,16 @@ def get_terminal_size(fallback=(80, 24)):
     return os.terminal_size((columns, lines))
 
 @py2_monkey_patch(os)
-class terminal_size(tuple):
+class terminal_size(tuple[int, int]):
     @property
-    def columns(self):
+    def columns(self) -> int:
         return self[0]
 
     @property
-    def lines(self):
+    def lines(self) -> int:
         return self[1]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'os.terminal_size(columns=%r, lines=%r)' % self
 
 terminal_size = namedtuple('terminal_size', 'columns lines')
@@ -87,7 +87,7 @@ terminal_size = namedtuple('terminal_size', 'columns lines')
 termsize = Struct('HHHH')
 
 @py2_monkey_patch(os)
-def get_terminal_size(fd):  # pylint: disable=function-redefined
+def get_terminal_size(fd) -> os.terminal_size:  # pylint: disable=function-redefined
     arr = b'\0' * termsize.size
     arr = fcntl.ioctl(fd, termios.TIOCGWINSZ, arr)
     lines, columns, xpixel, ypixel = termsize.unpack(arr)

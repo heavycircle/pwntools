@@ -8,6 +8,7 @@ import struct
 import subprocess
 import sys
 import time
+from typing import NoReturn
 
 from pwnlib import term
 from pwnlib.log import getLogger
@@ -16,13 +17,13 @@ from pwnlib.tubes.process import process
 
 log = getLogger(__name__)
 
-def testpwnproc(cmd):
+def testpwnproc(cmd) -> process:
     import fcntl
     import termios
     env = dict(os.environ)
     env.pop("PWNLIB_NOTERM", None)
     env["TERM"] = "xterm-256color"
-    def handleusr1(sig, frame):
+    def handleusr1(sig, frame) -> NoReturn:
         s = p.stderr.read()
         log.error("child process failed:\n%s", s.decode())
     signal.signal(signal.SIGUSR1, handleusr1)
@@ -47,7 +48,7 @@ from pwn import *
     fcntl.ioctl(p.stdout.fileno(), termios.TIOCSWINSZ, struct.pack('HH', 24, 80))
     return p
 
-def yesno(prompt, default=None):
+def yesno(prompt, default=None) -> bool:
     r"""Presents the user with prompt (typically in the form of question)
     which the user must answer yes or no.
 
@@ -254,7 +255,7 @@ def options(prompt, opts, default = None):
             if x >= 1 and x <= len(opts):
                 return x - 1
 
-def pause(n=None):
+def pause(n=None) -> None:
     r"""Waits for either user input or a specific number of seconds.
 
     Examples:
@@ -302,7 +303,7 @@ def pause(n=None):
     else:
         raise ValueError('pause(): n must be a number or None')
 
-def more(text):
+def more(text: str) -> None:
     r"""more(text)
 
     Shows text like the command line tool ``more``.

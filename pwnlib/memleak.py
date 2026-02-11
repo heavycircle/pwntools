@@ -80,7 +80,7 @@ class MemLeak(object):
         >>> leak[-1:2]
         b'zAB'
     """
-    def __init__(self, f, search_range = 20, reraise = True, relative = False):
+    def __init__(self, f, search_range = 20, reraise = True, relative = False) -> None:
         self.leak = f
         self.search_range = search_range
         self.reraise = reraise

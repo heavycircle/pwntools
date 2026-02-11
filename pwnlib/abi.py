@@ -27,7 +27,7 @@ class ABI(object):
     #: Indicates that this ABI returns to the next address on the slot
     returns            = True
 
-    def __init__(self, stack, arg_regs, align, minimum):
+    def __init__(self, stack, arg_regs, align, minimum) -> None:
         self.stack              = stack
         self.register_arguments = arg_regs
         self.arg_alignment      = align

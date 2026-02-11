@@ -270,13 +270,13 @@ class FileStructure(object):
     vars_=[]
     length={}
 
-    def __init__(self, null=0):
+    def __init__(self, null=0) -> None:
             self.vars_ = [variables[i]['name'] for i in sorted(variables.keys())]
             self.setdefault(null)
             self.length = _update_var(context.bytes)
             self._old_offset = (1 << context.bits) - 1
 
-    def __setattr__(self,item,value):
+    def __setattr__(self,item,value) -> None:
         if item in FileStructure.__dict__ or item in self.vars_:
             if hasattr(self, item) and isinstance(getattr(self, item), _FlagsUnionBase):
                 if isinstance(value, (bytes, bytearray)):
@@ -288,7 +288,7 @@ class FileStructure(object):
         else:
             log.error("Unknown variable %r" % item)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         structure=[]
         for i in self.vars_:
             val = getattr(self, i)
@@ -298,7 +298,7 @@ class FileStructure(object):
                 structure.append(" %s: %s" % (i, val))
         return "{"+ "\n".join(structure)+"}"
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(bytes(self))
 
     def __bytes__(self):
@@ -341,7 +341,7 @@ class FileStructure(object):
                 break
         return structure[:-1]
 
-    def setdefault(self,null):
+    def setdefault(self,null) -> None:
             self.flags=_IOFileFlags()
             self._IO_read_ptr=0
             self._IO_read_end=0

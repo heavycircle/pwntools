@@ -8,14 +8,14 @@ class PwnlibException(Exception):
 
     Pwnlib functions that encounters unrecoverable errors should call the
     :func:`pwnlib.log.error` function instead of throwing this exception directly.'''
-    def __init__(self, msg, reason = None, exit_code = None):
+    def __init__(self, msg, reason = None, exit_code = None) -> None:
         '''bar'''
         Exception.__init__(self, msg)
         self.reason = reason
         self.exit_code = exit_code
         self.message = msg
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         s = 'PwnlibException: %s' % self.message
         if self.reason:
             s += '\nReason:\n'

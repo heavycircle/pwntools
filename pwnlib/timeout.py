@@ -10,13 +10,13 @@ import pwnlib
 
 
 class _DummyContextClass(object):
-    def __enter__(self):   pass
-    def __exit__(self,*a): pass
+    def __enter__(self) -> None:   pass
+    def __exit__(self,*a) -> None: pass
 
 _DummyContext = _DummyContextClass()
 
 class _countdown_handler(object):
-    def __init__(self, obj, timeout):
+    def __init__(self, obj, timeout) -> None:
         self.obj     = obj
         self.timeout = timeout
 
@@ -31,16 +31,16 @@ class _countdown_handler(object):
 
         self.obj._timeout = self.timeout
         self.obj.timeout_change()
-    def __exit__(self, *a):
+    def __exit__(self, *a) -> None:
         self.obj._timeout = self.old_timeout
         self.obj._stop    = self.old_stop
         self.obj.timeout_change()
 
 class _local_handler(object):
-    def __init__(self, obj, timeout):
+    def __init__(self, obj, timeout) -> None:
         self.obj     = obj
         self.timeout = timeout
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.old_timeout  = self.obj._timeout
         self.old_stop     = self.obj._stop
 
@@ -48,17 +48,17 @@ class _local_handler(object):
         self.obj._timeout = self.timeout # leverage validation
         self.obj.timeout_change()
 
-    def __exit__(self, *a):
+    def __exit__(self, *a) -> None:
         self.obj._timeout = self.old_timeout
         self.obj._stop    = self.old_stop
         self.obj.timeout_change()
 
 class TimeoutDefault(object):
-    def __repr__(self): return "pwnlib.timeout.Timeout.default"
-    def __str__(self): return "<default timeout>"
+    def __repr__(self) -> str: return "pwnlib.timeout.Timeout.default"
+    def __str__(self) -> str: return "<default timeout>"
 
 class Maximum(float):
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'pwnlib.timeout.maximum'
 maximum = Maximum(2**20)
 
@@ -126,7 +126,7 @@ class Timeout(object):
     #: that the value is effectively infinite.
     maximum = maximum
 
-    def __init__(self, timeout=default):
+    def __init__(self, timeout=default) -> None:
         self._stop    = 0
         self.timeout = self._get_timeout_seconds(timeout)
 
@@ -144,7 +144,7 @@ class Timeout(object):
         return max(stop-time.time(), 0)
 
     @timeout.setter
-    def timeout(self, value):
+    def timeout(self, value) -> None:
         assert not self._stop
         self._timeout = self._get_timeout_seconds(value)
         self.timeout_change()
@@ -166,10 +166,10 @@ class Timeout(object):
                 value = self.maximum
         return value
 
-    def countdown_active(self):
+    def countdown_active(self) -> bool:
         return (self._stop == 0) or (self._stop > time.time())
 
-    def timeout_change(self):
+    def timeout_change(self) -> None:
         """
         Callback for subclasses to hook a timeout change.
         """

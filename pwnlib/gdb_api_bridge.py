@@ -19,13 +19,13 @@ class ServeResult:
         self.done = False
         self.exc = None
 
-    def set(self, exc):
+    def set(self, exc) -> None:
         with self.cv:
             self.done = True
             self.exc = exc
             self.cv.notify()
 
-    def wait(self):
+    def wait(self) -> None:
         with self.cv:
             while not self.done:
                 self.cv.wait()
@@ -42,7 +42,7 @@ class GdbConnection(Connection):
     SERVE_TIME = 0.1  # Number of seconds to serve.
     IDLE_TIME = 0.1  # Number of seconds to wait after serving.
 
-    def serve_gdb_thread(self, serve_result):
+    def serve_gdb_thread(self, serve_result) -> None:
         """Serve requests on GDB thread."""
         try:
             deadline = time.time() + self.SERVE_TIME
@@ -56,7 +56,7 @@ class GdbConnection(Connection):
         else:
             serve_result.set(None)
 
-    def serve_all(self):
+    def serve_all(self) -> None:
         """Modified version of rpyc.core.protocol.Connection.serve_all."""
         try:
             while not self.closed:
@@ -96,7 +96,7 @@ class GdbService(Service):
                 def stop(self):
                     return client.stop()
             if has_out_of_scope:
-                def out_of_scope(self):
+                def out_of_scope(self) -> None:
                     client.out_of_scope()
         return FinishBreakpoint(*args, **kwargs)
 

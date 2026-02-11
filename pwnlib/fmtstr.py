@@ -95,6 +95,7 @@ Example - Automated exploitation
 """
 from __future__ import division
 
+from collections.abc import Generator
 import logging
 import re
 from operator import itemgetter
@@ -126,7 +127,7 @@ WRITE_SIZE = {
     "long": 8,
 }
 
-def normalize_writes(writes):
+def normalize_writes(writes: dict):
     r"""
     This function converts user-specified writes to a dict ``{ address1: data1, address2: data2, ... }``
     such that all values are raw bytes and consecutive writes are merged to a single key.
@@ -177,7 +178,7 @@ class AtomWrite(object):
     """
     __slots__ = ( "start", "size", "integer", "mask" )
 
-    def __init__(self, start, size, integer, mask=None):
+    def __init__(self, start, size, integer, mask=None) -> None:
         if mask is None:
             mask = (1 << (8 * size)) - 1
         self.start = int(start)
@@ -191,18 +192,18 @@ class AtomWrite(object):
     def __key(self):
         return (self.start, self.size, self.integer, self.mask)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, AtomWrite):
             raise TypeError("comparision not supported between instances of '%s' and '%s'" % (type(self), type(other)))
         return self.__key() == other.__key()
 
-    def __ne__(self, other):
+    def __ne__(self, other) -> bool:
         return not self.__eq__(other)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.__key())
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "AtomWrite(start=%d, size=%d, integer=%#x, mask=%#x)" % (self.start, self.size, self.integer, self.mask)
 
     @property
@@ -210,7 +211,7 @@ class AtomWrite(object):
         return self.size * 8
 
     @property
-    def end(self):
+    def end(self) -> int:
         return self.start + self.size
 
     def compute_padding(self, counter):
@@ -284,7 +285,7 @@ class AtomWrite(object):
             shift = (self.size - stop) * 8
         return AtomWrite(self.start + start, stop - start, (self.integer >> shift) & clip, (self.mask >> shift) & clip)
 
-def make_atoms_simple(address, data, badbytes=frozenset()):
+def make_atoms_simple(address: int, data: bytes, badbytes = frozenset()):
     """
     Build format string atoms for writing some data at a given address where some bytes are not allowed
     to appear in addresses (such as nullbytes).
@@ -311,7 +312,7 @@ def make_atoms_simple(address, data, badbytes=frozenset()):
         raise RuntimeError("impossible to avoid a bad byte in starting address %x" % address)
 
     i = 0
-    out = []
+    out: list[AtomWrite] = []
     end = address + len(data)
     while i < len(data):
         candidate = AtomWrite(address + i, 1, data[i])
@@ -327,7 +328,7 @@ def make_atoms_simple(address, data, badbytes=frozenset()):
     return out
 
 
-def merge_atoms_writesize(atoms, maxsize):
+def merge_atoms_writesize(atoms: list[AtomWrite], maxsize: int):
     """Merge consecutive atoms based on size.
 
     This function simply merges adjacent atoms as long as the merged atom's size is not larger than ``maxsize``.
@@ -357,7 +358,7 @@ def merge_atoms_writesize(atoms, maxsize):
         atoms[:best[0]] = []
     return out
 
-def find_min_hamming_in_range_step(prev, step, carry, strict):
+def find_min_hamming_in_range_step(prev: dict, step: tuple, carry: int, strict: int) -> tuple:
     """
     Compute a single step of the algorithm for find_min_hamming_in_range
 
@@ -415,7 +416,7 @@ def find_min_hamming_in_range_step(prev, step, carry, strict):
         return prev_for_other[0], (prev_for_other[1] << 8) | lowcarrybyte, (prev_for_other[2] << 8)
     return None
 
-def find_min_hamming_in_range(maxbytes, lower, upper, target):
+def find_min_hamming_in_range(maxbytes: int, lower: int, upper: int, target: int) -> tuple[int, int, int] | None:
     """
     Find the value which differs in the least amount of bytes from the target and is in the given range.
 
@@ -442,7 +443,7 @@ def find_min_hamming_in_range(maxbytes, lower, upper, target):
         >>> pp(pwnlib.fmtstr.find_min_hamming_in_range(4, 0x1234, 0x10000, 0x0))
         (3, '0x10000', '0xff00ffff')
     """
-    steps = []
+    steps: list[tuple[int, int, int]] = []
     for _ in range(maxbytes):
         steps += [(lower, upper, target)]
         lower = lower >> 8
@@ -450,7 +451,7 @@ def find_min_hamming_in_range(maxbytes, lower, upper, target):
         target = target >> 8
 
     # the initial state
-    prev = {
+    prev: dict[tuple[bool, bool], tuple[int, int, int] | None] = {
         (False,False): (0, 0, 0),
         (False,True): None if upper == lower else (0, lower, 0),
         (True,False): None if upper == lower else (0, lower, 0),
@@ -467,7 +468,7 @@ def find_min_hamming_in_range(maxbytes, lower, upper, target):
 # what we don't do:
 #  - create new atoms that cannot be created by merging existing atoms
 #  - optimize based on masks
-def merge_atoms_overlapping(atoms, sz, szmax, numbwritten, overflows):
+def merge_atoms_overlapping(atoms: list[AtomWrite], sz: int, szmax: int, numbwritten: int, overflows: int) -> list[AtomWrite]:
     """
     Takes a list of atoms and merges consecutive atoms to reduce the number of atoms.
     For example if you have two atoms ``AtomWrite(0, 1, 1)`` and ``AtomWrite(1, 1, 1)``
@@ -564,7 +565,7 @@ def merge_atoms_overlapping(atoms, sz, szmax, numbwritten, overflows):
         out += [best_candidate]
     return out
 
-def overlapping_atoms(atoms):
+def overlapping_atoms(atoms: list[AtomWrite]) -> Generator[tuple[AtomWrite, AtomWrite]]:
     """
     Finds pairs of atoms that write to the same address.
 
@@ -595,12 +596,12 @@ def overlapping_atoms(atoms):
             prev = atom
 
 class AtomQueue(object):
-    def __init__(self, numbwritten):
+    def __init__(self, numbwritten) -> None:
         self.queues = { sz: SortedList(key=lambda atom: atom.integer) for sz in SPECIFIER.keys() }
         self.positions = { sz: 0 for sz in SPECIFIER }
         self.numbwritten = numbwritten
 
-    def add(self, atom):
+    def add(self, atom) -> None:
         self.queues[atom.size].add(atom)
         if atom.integer & SZMASK[atom.size] < self.numbwritten & SZMASK[atom.size]:
             self.positions[atom.size] += 1
@@ -628,7 +629,7 @@ class AtomQueue(object):
 
         return best_atom
 
-def sort_atoms(atoms, numbwritten):
+def sort_atoms(atoms: list[AtomWrite], numbwritten: int):
     """
     This function sorts atoms such that the amount by which the format string counter has to been increased
     between consecutive atoms is minimized.
@@ -786,7 +787,7 @@ def make_payload_dollar(data_offset, atoms, numbwritten=0, countersize=4, no_dol
 
     return fmt.encode(), data
 
-def make_atoms(writes, sz, szmax, numbwritten, overflows, strategy, badbytes):
+def make_atoms(writes: dict, sz: int, szmax: int, numbwritten: int, overflows: int, strategy: str, badbytes: str):
     """
     Builds an optimized list of atoms for the given format string payload parameters.
     This function tries to optimize two things:
@@ -818,7 +819,7 @@ def make_atoms(writes, sz, szmax, numbwritten, overflows, strategy, badbytes):
         all_atoms += atoms
     return all_atoms
 
-def fmtstr_split(offset, writes, numbwritten=0, write_size='byte', write_size_max='long', overflows=16, strategy="small", badbytes=frozenset(), no_dollars=False):
+def fmtstr_split(offset: int, writes, numbwritten: int = 0, write_size: str = 'byte', write_size_max: str = 'long', overflows: int = 16, strategy: str = "small", badbytes=frozenset(), no_dollars: bool = False):
     """
     Build a format string like fmtstr_payload but return the string and data separately.
     """
@@ -834,7 +835,9 @@ def fmtstr_split(offset, writes, numbwritten=0, write_size='byte', write_size_ma
 
     return make_payload_dollar(offset, atoms, numbwritten, no_dollars=no_dollars)
 
-def fmtstr_payload(offset, writes, numbwritten=0, write_size='byte', write_size_max='long', overflows=16, strategy="small", badbytes=frozenset(), offset_bytes=0, no_dollars=False):
+def fmtstr_payload(offset: int, writes: dict[int, int], numbwritten: int = 0, write_size: str = 'byte',
+                   write_size_max: str = 'long', overflows: int = 16, strategy: str = "small",
+                   badbytes=frozenset(), offset_bytes: int = 0, no_dollars: bool = False):
     r"""fmtstr_payload(offset, writes, numbwritten=0, write_size='byte') -> str
 
     Makes payload with given parameter.

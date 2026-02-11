@@ -67,6 +67,7 @@ from pwnlib import tubes
 from pwnlib.context import LocalContext
 from pwnlib.context import context
 from pwnlib.log import getLogger
+from pwnlib.tubes.process import process
 from pwnlib.util import misc
 from pwnlib.util import proc
 
@@ -75,7 +76,7 @@ log = getLogger(__name__)
 CREATE_SUSPENDED = 0x00000004
 
 @LocalContext
-def debug(args, windbgscript=None, exe=None, env=None, creationflags=0, **kwargs):
+def debug(args, windbgscript=None, exe=None, env=None, creationflags=0, **kwargs) -> process:
     """debug(args, windbgscript=None, exe=None, env=None, creationflags=0) -> tube
 
     Launch a process in suspended state, attach debugger and resume process.
@@ -223,7 +224,7 @@ def attach(target, windbgscript=None, windbg_args=[]):
     io = subprocess.Popen(cmd)
     windbg_pid = io.pid
 
-    def kill():
+    def kill() -> None:
         try:
             os.kill(windbg_pid, signal.SIGTERM)
         except OSError:

@@ -17,7 +17,7 @@ _lock = threading.Lock()
 _ident = 0
 _handlers = {}
 
-def register(func, *args, **kwargs):
+def register(func, *args, **kwargs) -> int:
     """register(func, *args, **kwargs)
 
     Registers a function to be called when an unhandled exception occurs.  The
@@ -55,7 +55,7 @@ def register(func, *args, **kwargs):
     _handlers[ident] = (func, args, kwargs, vars(context))
     return ident
 
-def unregister(func):
+def unregister(func) -> None:
     """unregister(func)
 
     Remove `func` from the collection of registered functions.  If `func` isn't
@@ -64,7 +64,7 @@ def unregister(func):
     if func in _handlers:
         del _handlers[func]
 
-def _run_handlers():
+def _run_handlers() -> None:
     """_run_handlers()
 
     Run registered handlers.  They run in the reverse order of which they were
@@ -91,7 +91,7 @@ def _run_handlers():
 # we rely on the existing excepthook to print exceptions
 _oldhook = getattr(sys, 'excepthook', None)
 
-def _newhook(typ, val, tb):
+def _newhook(typ, val, tb) -> None:
     """_newhook(typ, val, tb)
 
     Our excepthook replacement.  First the original hook is called to print the

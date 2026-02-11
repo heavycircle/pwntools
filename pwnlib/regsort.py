@@ -112,7 +112,7 @@ def resolve_order(reg, deps):
     x.append(reg)
     return x
 
-def depends_on_cycle(reg, assignments, in_cycles):
+def depends_on_cycle(reg, assignments, in_cycles) -> bool:
     while reg in assignments:
         if reg in in_cycles:
             return True

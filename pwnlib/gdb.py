@@ -141,6 +141,7 @@ Member Documentation
 from __future__ import absolute_import
 from __future__ import division
 
+from collections.abc import Callable
 import os
 import platform
 import psutil
@@ -151,6 +152,7 @@ import tempfile
 from threading import Event
 import time
 
+from pwn import ssh
 from pwnlib import adb
 from pwnlib import atexit
 from pwnlib import elf
@@ -409,19 +411,21 @@ def _gdbserver_port(gdbserver, ssh):
 
     return port
 
-def _get_which(ssh=None):
+def _get_which(ssh: ssh | None = None):
     if ssh:                        return ssh.which
     elif context.os == 'android':  return adb.which
     else:                          return misc.which
 
-def _get_runner(ssh=None):
+def _get_runner(ssh: ssh | None = None):
     if ssh:                        return ssh.process
     elif context.os == 'android':  return adb.process
     else:                          return tubes.process.process
 
 @LocalContext
-def debug(args, gdbscript=None, gdb_args=None, exe=None, ssh=None, env=None, port=0, gdbserver_args=None, sysroot=None, api=False,
-        preexec_fn=None, preexec_args=(), **kwargs):
+def debug(args, gdbscript: str | None = None, gdb_args: list | None = None, exe: str | None = None,
+          ssh: ssh | None = None, env: dict | None = None, port: int = 0, 
+          gdbserver_args: list | None = None, sysroot: str | None = None, api: bool = False, 
+          preexec_fn: Callable | None = None, preexec_args=(), **kwargs):
     r"""
     Launch a GDB server with the specified command line,
     and launches GDB to attach to it.

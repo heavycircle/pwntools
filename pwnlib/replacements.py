@@ -4,7 +4,7 @@
 import time as __time
 
 
-def sleep(n):
+def sleep(n: int) -> None:
     """sleep(n)
 
     Replacement for :func:`time.sleep()`, which does not return if a signal is received.

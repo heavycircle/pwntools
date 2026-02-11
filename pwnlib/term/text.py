@@ -24,7 +24,7 @@ def eval_when(when):
         raise ValueError('text.when: must be a file-object or "always", "never" or "auto"')
 
 class Module(types.ModuleType):
-    def __init__(self):
+    def __init__(self) -> types.NoneType:
         self.__file__ = __file__
         self.__name__ = __name__
         self.num_colors = termcap.get('colors', default=8) if sys.platform == 'win32' else 8
@@ -56,15 +56,15 @@ class Module(types.ModuleType):
         return self._when
 
     @when.setter
-    def when(self, val):
+    def when(self, val) -> None:
         self._when = eval_when(val)
 
     @property
-    def has_bright(self):
+    def has_bright(self) -> bool:
         return self.num_colors >= 16
     
     @property
-    def has_gray(self):
+    def has_gray(self) -> bool:
         return self.has_bright
 
     def _fg_color(self, c):
@@ -108,7 +108,7 @@ class Module(types.ModuleType):
                     ds.pop(0)
                 except KeyError:
                     break
-            def c():
+            def c() -> int:
                 bright = 0
                 c = ds.pop(0)
                 if c == 'bright':

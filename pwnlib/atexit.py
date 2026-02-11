@@ -23,7 +23,7 @@ _lock = threading.Lock()
 _ident = 0
 _handlers = {}
 
-def register(func, *args, **kwargs):
+def register(func, *args, **kwargs) -> int:
     """register(func, *args, **kwargs)
 
     Registers a function to be called on program termination.  The function will
@@ -59,7 +59,7 @@ def register(func, *args, **kwargs):
     _handlers[ident] = (func, args, kwargs, vars(context))
     return ident
 
-def unregister(ident):
+def unregister(ident) -> None:
     """unregister(ident)
 
     Remove the exit-handler identified by `ident` from the list of registered
@@ -68,7 +68,7 @@ def unregister(ident):
     if ident in _handlers:
         del _handlers[ident]
 
-def _run_handlers():
+def _run_handlers() -> None:
     """_run_handlers()
 
     Run registered exit-handlers.  They run in the reverse order of which they

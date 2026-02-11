@@ -102,6 +102,7 @@ import string
 import sys
 import threading
 import time
+from typing import NoReturn
 
 from pwnlib import term
 from pwnlib.config import register_config
@@ -134,7 +135,7 @@ _msgtype_prefixes = {
     }
 
 
-def read_log_config(settings):
+def read_log_config(settings) -> None:
     log = getLogger(__name__)
     for key, value in settings.items():
         if '.' not in key:
@@ -170,7 +171,7 @@ class Progress(object):
     This class is intended for internal use.  Progress loggers should be created
     using :meth:`Logger.progress`.
     """
-    def __init__(self, logger, msg, status, level, args, kwargs):
+    def __init__(self, logger, msg, status, level, args, kwargs) -> None:
         self._logger = logger
         self._msg = msg
         self._status = status
@@ -183,7 +184,7 @@ class Progress(object):
         # its status line, so we reset `last_status` to accommodate this pattern
         self.last_status = 0
 
-    def _log(self, status, args, kwargs, msgtype):
+    def _log(self, status, args, kwargs, msgtype) -> None:
         # Logs are strings, not bytes.  Handle Python3 bytes() objects.
         status = _need_text(status)
 
@@ -196,7 +197,7 @@ class Progress(object):
         msg += status
         self._logger._log(self._level, msg, args, kwargs, msgtype, self)
 
-    def status(self, status, *args, **kwargs):
+    def status(self, status, *args, **kwargs) -> None:
         """status(status, *args, **kwargs)
 
         Logs a status update for the running job.
@@ -211,7 +212,7 @@ class Progress(object):
             self.last_status = now
             self._log(status, args, kwargs, 'status')
 
-    def success(self, status = 'Done', *args, **kwargs):
+    def success(self, status = 'Done', *args, **kwargs) -> None:
         """success(status = 'Done', *args, **kwargs)
 
         Logs that the running job succeeded.  No further status updates are
@@ -222,7 +223,7 @@ class Progress(object):
         self._log(status, args, kwargs, 'success')
         self._stopped = True
 
-    def failure(self, status = 'Failed', *args, **kwargs):
+    def failure(self, status = 'Failed', *args, **kwargs) -> None:
         """failure(message)
 
         Logs that the running job failed.  No further status updates are
@@ -236,7 +237,7 @@ class Progress(object):
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_typ, exc_val, exc_tb):
+    def __exit__(self, exc_typ, exc_val, exc_tb) -> None:
         # if the progress logger is already stopped these are no-ops
         if exc_typ is None:
             self.success()
@@ -266,7 +267,7 @@ class Logger(object):
     _one_time_infos    = set()
     _one_time_warnings = set()
 
-    def __init__(self, logger=None):
+    def __init__(self, logger=None) -> None:
         if logger is None:
             # This is a minor hack to permit user-defined classes which inherit
             # from a tube (which do not actually reside in the pwnlib library)
@@ -287,7 +288,7 @@ class Logger(object):
             return levelString
         return logging._levelNames[levelString.upper()]
 
-    def _log(self, level, msg, args, kwargs, msgtype, progress = None):
+    def _log(self, level, msg, args, kwargs, msgtype, progress = None) -> None:
         # Logs are strings, not bytes.  Handle Python3 bytes() objects.
         msg = _need_text(msg)
 
@@ -297,7 +298,7 @@ class Logger(object):
         kwargs['extra'] = extra
         self._logger.log(level, msg, *args, **kwargs)
 
-    def progress(self, message, status = '', *args, **kwargs):
+    def progress(self, message, status = '', *args, **kwargs) -> Progress:
         """progress(message, status = '', *args, level = logging.INFO, **kwargs) -> Progress
 
         Creates a new progress logger which creates log records with log level
@@ -322,11 +323,11 @@ class Logger(object):
         level = self._getlevel(kwargs.pop('level', logging.INFO))
         return Progress(self, message, status, level, args, kwargs)
 
-    def waitfor(self, *args, **kwargs):
+    def waitfor(self, *args, **kwargs) -> Progress:
         """Alias for :meth:`progress`."""
         return self.progress(*args, **kwargs)
 
-    def indented(self, message, *args, **kwargs):
+    def indented(self, message, *args, **kwargs) -> None:
         """indented(message, *args, level = logging.INFO, **kwargs)
 
         Log a message but don't put a line prefix on it.
@@ -338,21 +339,21 @@ class Logger(object):
         level = self._getlevel(kwargs.pop('level', logging.INFO))
         self._log(level, message, args, kwargs, 'indented')
 
-    def success(self, message, *args, **kwargs):
+    def success(self, message, *args, **kwargs) -> None:
         """success(message, *args, **kwargs)
 
         Logs a success message.
         """
         self._log(logging.INFO, message, args, kwargs, 'success')
 
-    def failure(self, message, *args, **kwargs):
+    def failure(self, message, *args, **kwargs) -> None:
         """failure(message, *args, **kwargs)
 
         Logs a failure message.
         """
         self._log(logging.INFO, message, args, kwargs, 'failure')
 
-    def info_once(self, message, *args, **kwargs):
+    def info_once(self, message, *args, **kwargs) -> None:
         """info_once(message, *args, **kwargs)
 
         Logs an info message.  The same message is never printed again.
@@ -363,7 +364,7 @@ class Logger(object):
                 self._one_time_infos.add(m)
             self._log(logging.INFO, message, args, kwargs, 'info_once')
 
-    def warning_once(self, message, *args, **kwargs):
+    def warning_once(self, message, *args, **kwargs) -> None:
         """warning_once(message, *args, **kwargs)
 
         Logs a warning message.  The same message is never printed again.
@@ -374,34 +375,34 @@ class Logger(object):
                 self._one_time_warnings.add(m)
             self._log(logging.WARNING, message, args, kwargs, 'warning_once')
 
-    def warn_once(self, *args, **kwargs):
+    def warn_once(self, *args, **kwargs) -> None:
         """Alias for :meth:`warning_once`."""
         return self.warning_once(*args, **kwargs)
 
     # logging functions also exposed by `logging.Logger`
 
-    def debug(self, message, *args, **kwargs):
+    def debug(self, message, *args, **kwargs) -> None:
         """debug(message, *args, **kwargs)
 
         Logs a debug message.
         """
         self._log(logging.DEBUG, message, args, kwargs, 'debug')
 
-    def info(self, message, *args, **kwargs):
+    def info(self, message, *args, **kwargs) -> None:
         """info(message, *args, **kwargs)
 
         Logs an info message.
         """
         self._log(logging.INFO, message, args, kwargs, 'info')
 
-    def hexdump(self, message, *args, **kwargs):
+    def hexdump(self, message, *args, **kwargs) -> None:
         # cyclic dependencies FTW!
         # TODO: Move pwnlib.util.fiddling.hexdump into a new module.
         import pwnlib.util.fiddling
 
         self.info(pwnlib.util.fiddling.hexdump(message, *args, **kwargs))
 
-    def maybe_hexdump(self, message, *args, **kwargs):
+    def maybe_hexdump(self, message, *args, **kwargs) -> None:
         """maybe_hexdump(self, message, *args, **kwargs)
 
         Logs a message using indented. Repeated single byte is compressed, and
@@ -416,18 +417,18 @@ class Logger(object):
             import pwnlib.util.fiddling
             self.indented(pwnlib.util.fiddling.hexdump(message), *args, **kwargs)
 
-    def warning(self, message, *args, **kwargs):
+    def warning(self, message, *args, **kwargs) -> None:
         """warning(message, *args, **kwargs)
 
         Logs a warning message.
         """
         self._log(logging.WARNING, message, args, kwargs, 'warning')
 
-    def warn(self, *args, **kwargs):
+    def warn(self, *args, **kwargs) -> None:
         """Alias for :meth:`warning`."""
         return self.warning(*args, **kwargs)
 
-    def error(self, message, *args, **kwargs):
+    def error(self, message, *args, **kwargs) -> NoReturn:
         """error(message, *args, **kwargs)
 
         To be called outside an exception handler.
@@ -437,7 +438,7 @@ class Logger(object):
         self._log(logging.ERROR, message, args, kwargs, 'error')
         raise PwnlibException(message % args)
 
-    def exception(self, message, *args, **kwargs):
+    def exception(self, message, *args, **kwargs) -> NoReturn:
         """exception(message, *args, **kwargs)
 
         To be called from an exception handler.
@@ -448,14 +449,14 @@ class Logger(object):
         self._log(logging.ERROR, message, args, kwargs, 'exception')
         raise
 
-    def critical(self, message, *args, **kwargs):
+    def critical(self, message, *args, **kwargs) -> None:
         """critical(message, *args, **kwargs)
 
         Logs a critical message.
         """
         self._log(logging.CRITICAL, message, args, kwargs, 'critical')
 
-    def log(self, level, message, *args, **kwargs):
+    def log(self, level, message, *args, **kwargs) -> None:
         """log(level, message, *args, **kwargs)
 
         Logs a message with log level `level`.  The ``pwnlib`` formatter will
@@ -474,7 +475,7 @@ class Logger(object):
             effectiveLevel = context.log_level
         return effectiveLevel <= level
 
-    def setLevel(self, level):
+    def setLevel(self, level) -> None:
         """setLevel(level)
 
         Set the logging level for the underlying logger.
@@ -482,14 +483,14 @@ class Logger(object):
         with context.local(log_level=level):
             self._logger.setLevel(context.log_level)
 
-    def addHandler(self, handler):
+    def addHandler(self, handler) -> None:
         """addHandler(handler)
 
         Add the specified handler to the underlying logger.
         """
         self._logger.addHandler(handler)
 
-    def removeHandler(self, handler):
+    def removeHandler(self, handler) -> None:
         """removeHandler(handler)
 
         Remove the specified handler from the underlying logger.
@@ -500,7 +501,7 @@ class Logger(object):
     def level(self):
         return self._logger.level
     @level.setter
-    def level(self, value):
+    def level(self, value) -> None:
         with context.local(log_level=value):
             self._logger.level = context.log_level
 
@@ -520,9 +521,9 @@ class Handler(logging.StreamHandler):
     def stream(self):
         return context.log_console
     @stream.setter
-    def stream(self, value):
+    def stream(self, value) -> None:
         pass
-    def emit(self, record):
+    def emit(self, record) -> None:
         """
         Emit a log record or create/update an animated progress logger
         depending on whether :data:`term.term_mode` is enabled.
@@ -615,7 +616,7 @@ class Formatter(logging.Formatter):
     # Newline, followed by an indent.  Used to wrap multiple lines.
     nlindent  = '\n' + indent
 
-    def format(self, record):
+    def format(self, record) -> str:
         # use the default formatter to actually format the record
         msg = super(Formatter, self).format(record)
 
@@ -645,7 +646,7 @@ class Formatter(logging.Formatter):
         msg = self.nlindent.join(msg.splitlines())
         return msg
 
-def _need_text(s):
+def _need_text(s) -> str:
     # circular import wrapper
     global _need_text
     from pwnlib.util.packing import _need_text
@@ -653,7 +654,7 @@ def _need_text(s):
 
 # we keep a dictionary of loggers such that multiple calls to `getLogger` with
 # the same name will return the same logger
-def getLogger(name):
+def getLogger(name) -> Logger:
     return Logger(logging.getLogger(name))
 
 class LogfileHandler(logging.FileHandler):
@@ -663,9 +664,9 @@ class LogfileHandler(logging.FileHandler):
     def stream(self):
         return context.log_file
     @stream.setter
-    def stream(self, value):
+    def stream(self, value) -> None:
         pass
-    def handle(self, *a, **kw):
+    def handle(self, *a, **kw) -> None:
         if self.stream.name is not None:
             super(LogfileHandler, self).handle(*a, **kw)
 
@@ -691,7 +692,7 @@ console   = Handler()
 formatter = Formatter()
 console.setFormatter(formatter)
 
-def install_default_handler():
+def install_default_handler() -> None:
     '''install_default_handler()
 
     Instantiates a :class:`Handler` and :class:`Formatter` and installs them for
