@@ -56,6 +56,7 @@ import logging
 import os
 import string
 import sys
+from collections.abc import Callable
 
 from pwnlib import term
 from pwnlib.context import context
@@ -81,7 +82,7 @@ if basename == 'pwn' or basename in pwnlib.commandline.__all__:
     free_form = False
 
 
-def isident(s):
+def isident(s: str) -> bool:
     """
     Helper function to check whether a string is a valid identifier,
     as passed in on the command-line.
@@ -96,7 +97,7 @@ def isident(s):
         return False
     return True
 
-def asbool(s):
+def asbool(s: str) -> bool:
     """
     Convert a string to its boolean value
     """
@@ -109,62 +110,64 @@ def asbool(s):
     else:
         raise ValueError('must be integer or boolean: %r' % s)
 
-def LOG_LEVEL(x):
+def LOG_LEVEL(x: str) -> None:
     """Sets the logging verbosity used via ``context.log_level``,
     e.g. ``LOG_LEVEL=debug``.
     """
     with context.local(log_level=x):
         context.defaults['log_level']=context.log_level
 
-def LOG_FILE(x):
+def LOG_FILE(x: str) -> None:
     """Sets a log file to be used via ``context.log_file``, e.g.
     ``LOG_FILE=./log.txt``"""
     context.log_file=x
 
-def SILENT(x):
+def SILENT(x: str) -> None:
     """Sets the logging verbosity to ``error`` which silences most
     output."""
     LOG_LEVEL('error')
 
-def DEBUG(x):
+def DEBUG(x: str) -> None:
     """Sets the logging verbosity to ``debug`` which displays much
     more information, including logging each byte sent by tubes."""
     LOG_LEVEL('debug')
 
-def NOTERM(v):
+def NOTERM(v: str) -> None:
     """Disables pretty terminal settings and animations."""
     if asbool(v):
         global term_mode
         term_mode = False
 
-def TIMEOUT(v):
+def TIMEOUT(v: str) -> None:
     """Sets a timeout for tube operations (in seconds) via
     ``context.timeout``, e.g. ``TIMEOUT=30``"""
     context.defaults['timeout'] = int(v)
 
-def RANDOMIZE(v):
+def RANDOMIZE(v: str) -> None:
     """Enables randomization of various pieces via ``context.randomize``"""
     context.defaults['randomize'] = asbool(v)
 
-def NOASLR(v):
+def NOASLR(v: str) -> None:
     """Disables ASLR via ``context.aslr``"""
     context.defaults['aslr'] = not asbool(v)
 
-def NOPTRACE(v):
+def NOPTRACE(v: str) -> None:
     """Disables facilities which require ``ptrace`` such as ``gdb.attach()``
     statements, via ``context.noptrace``."""
     context.defaults['noptrace'] = asbool(v)
 
-def STDERR(v):
+def STDERR(v: str) -> None:
     """Sends logging to ``stderr`` by default, instead of ``stdout``"""
     context.log_console = sys.stderr
 
-def LOCAL_LIBCDB(v):
+def LOCAL_LIBCDB(v: str) -> None:
     """Sets path to local libc-database via ``context.local_libcdb``, e.g. 
     ``LOCAL_LIBCDB='/path/to/libc-databse'``"""
     context.local_libcdb = v
 
-hooks = {
+HookFunc = Callable[[str], None]
+
+hooks: dict[str, HookFunc] = {
     'LOG_LEVEL': LOG_LEVEL,
     'LOG_FILE': LOG_FILE,
     'DEBUG': DEBUG,
@@ -178,7 +181,7 @@ hooks = {
     'LOCAL_LIBCDB': LOCAL_LIBCDB,
 }
 
-def initialize():
+def initialize() -> None:
     global args, term_mode
 
     # Hack for readthedocs.org
