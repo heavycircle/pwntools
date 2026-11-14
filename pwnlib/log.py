@@ -100,13 +100,14 @@ import string
 import threading
 import time
 from types import TracebackType
-from typing import Any, NoReturn
+from typing import Any, NoReturn, TextIO
 
 from pwnlib import term
 from pwnlib.config import register_config
 from pwnlib.context import Thread
 from pwnlib.context import context
 from pwnlib.exception import PwnlibException
+from pwnlib.internal.typing import TextDecorator
 from pwnlib.term import spinners
 from pwnlib.term import text
 
@@ -157,7 +158,7 @@ register_config('log', read_log_config)
 
 # the text decoration to use for spinners.  the spinners themselves can be found
 # in the `pwnlib.term.spinners` module
-_spinner_style = text.bold_blue
+_spinner_style: TextDecorator = text.bold_blue
 
 class Progress:
     """
@@ -288,7 +289,7 @@ class Logger:
         return logging._nameToLevel[levelString.upper()]
         
 
-    def _log(self, level: int, msg: object, args: tuple[Any], kwargs: dict[str, Any], msgtype: str | None, progress: Progress | None = None):
+    def _log(self, level: int, msg: object, args: tuple[Any], kwargs: dict[str, Any], msgtype: str | None, progress: Progress | None = None) -> None:
         # Logs are strings, not bytes.  Handle Python3 bytes() objects.
         msg = _need_text(msg)
 
@@ -524,12 +525,12 @@ class Handler(logging.StreamHandler):
     An instance of this handler is added to the ``'pwnlib'`` logger.
     """
     @property
-    def stream(self):
+    def stream(self) -> TextIO:
         return context.log_console
     @stream.setter
-    def stream(self, value):
+    def stream(self, value: object) -> None:
         pass
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         """
         Emit a log record or create/update an animated progress logger
         depending on whether :data:`term.term_mode` is enabled.
@@ -554,15 +555,15 @@ class Handler(logging.StreamHandler):
         # is enabled we can have animated spinners! so check that
         # Don't show spinners if the output is being redirected
         if progress is None or not term.term_mode or not os.path.sameopenfile(context.log_console.fileno(), term.term.fd.fileno()):
-            super(Handler, self).emit(record)
+            super().emit(record)
             return
 
         # yay, spinners!
 
         # since we want to be able to update the spinner we overwrite the
         # message type so that the formatter doesn't output a prefix symbol
-        msgtype = record.pwnlib_msgtype
-        record.pwnlib_msgtype = 'animated'
+        msgtype: str = getattr(record, "pwnlib_msgtype")
+        setattr(record, "pwnlib_msgtype", "animated")
         msg = "%s\n" % self.format(record)
 
         # we enrich the `Progress` object to keep track of the spinner
@@ -570,7 +571,7 @@ class Handler(logging.StreamHandler):
             spinner_handle = term.output('[x] ')
             msg_handle = term.output(msg)
             stop = threading.Event()
-            def spin():
+            def spin() -> None:
                 '''Wheeeee!'''
                 state = 0
                 states = random.choice(spinners.spinners)
@@ -665,7 +666,7 @@ def getLogger(name: str | None) -> Logger:
     return Logger(logging.getLogger(name))
 
 class LogfileHandler(logging.FileHandler):
-    def __init__(self):
+    def __init__(self) -> None:
         super(LogfileHandler, self).__init__('', delay=True)
     @property
     def stream(self) -> TextIOWrapper:
