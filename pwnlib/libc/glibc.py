@@ -162,7 +162,7 @@ class ExitFunc:
     dso: int | None
 
     def __init__(self, flavor: ExitFlavor, func: int, guard: int,
-                 arg: int | None = None, dso: int | None = None):
+                 arg: int | None = None, dso: int | None = None) -> None:
         self.flavor = flavor
         self.fn = func
         self.guard = guard
@@ -290,7 +290,7 @@ class ExitFuncList:
     idx: int
     fns: list[ExitFunc]
 
-    def __init__(self, nextp: int, fns: list[ExitFunc]):
+    def __init__(self, nextp: int, fns: list[ExitFunc]) -> None:
         self.nextp = nextp
         self.fns = fns
         self.idx = len(fns)
@@ -370,7 +370,7 @@ class ExitDtorList:
     lmap: int
     nextl: int
 
-    def __init__(self, func: int, guard: int, obj: int, lmap: int, nextl: int):
+    def __init__(self, func: int, guard: int, obj: int, lmap: int, nextl: int) -> None:
         self.func = func
         self.guard = guard
         self.obj = obj
