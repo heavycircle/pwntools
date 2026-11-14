@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pwnlib.context import LocalContext
 from pwnlib.context import context
 
@@ -26,7 +28,7 @@ class ABI:
     #: Indicates that this ABI returns to the next address on the slot
     returns: bool = True
 
-    def __init__(self, stack, arg_regs, align, minimum):
+    def __init__(self, stack: str, arg_regs: list[str], align: int, minimum: int) -> None:
         self.stack              = stack
         self.register_arguments = arg_regs
         self.arg_alignment      = align
@@ -34,7 +36,7 @@ class ABI:
 
     @staticmethod
     @LocalContext
-    def default():
+    def default() -> ABI:
         if context.os == 'android':
             context.os = 'linux'
 
@@ -66,7 +68,7 @@ class ABI:
 
     @staticmethod
     @LocalContext
-    def syscall():
+    def syscall() -> SyscallABI:
         if context.os == 'android':
             context.os = 'linux'
 
@@ -96,7 +98,7 @@ class ABI:
 
     @staticmethod
     @LocalContext
-    def sigreturn():
+    def sigreturn() -> SigreturnABI:
         if context.os == 'android':
             context.os = 'linux'
 
@@ -128,8 +130,8 @@ class SyscallABI(ABI):
     #: Register which should be loaded with the syscall number.
     syscall_register: str
 
-    def __init__(self, *a, **kw):
-        super(SyscallABI, self).__init__(*a, **kw)
+    def __init__(self, stack: str, arg_regs: list[str], align: int, minimum: int) -> None:
+        super().__init__(stack, arg_regs, align, minimum)
         self.syscall_register = self.register_arguments[0]
 
 
