@@ -5,7 +5,7 @@ class Device:
     serial: str | None = None
     os: str | None = None
 
-    def __init__(self, serial: str | None = None):
+    def __init__(self, serial: str | None = None) -> None:
         self.serial = serial
 
     def __str__(self) -> str:

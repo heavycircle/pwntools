@@ -35,7 +35,7 @@ class Gadget:
     #:      add esp, 0x10; ret ==> 0x14
     move: int
 
-    def __init__(self, address: int, insns: list[str], regs: dict[str, int | str], move: int):
+    def __init__(self, address: int, insns: list[str], regs: dict[str, int | str], move: int) -> None:
         self.address = int(address)
         self.insns   = insns
         self.regs    = regs
