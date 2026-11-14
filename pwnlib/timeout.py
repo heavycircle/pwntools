@@ -17,7 +17,7 @@ class _DummyContextClass:
 _DummyContext = _DummyContextClass()
 
 class _countdown_handler:
-    def __init__(self, obj: Timeout, timeout: float):
+    def __init__(self, obj: Timeout, timeout: float) -> None:
         self.obj     = obj
         self.timeout = timeout
 
@@ -38,7 +38,7 @@ class _countdown_handler:
         self.obj.timeout_change()
 
 class _local_handler:
-    def __init__(self, obj: Timeout, timeout: float):
+    def __init__(self, obj: Timeout, timeout: float) -> None:
         self.obj     = obj
         self.timeout = timeout
     def __enter__(self) -> None:
@@ -129,7 +129,7 @@ class Timeout:
     #: that the value is effectively infinite.
     maximum: Maximum = maximum
 
-    def __init__(self, timeout: TimeoutValue = default):
+    def __init__(self, timeout: TimeoutValue = default) -> None:
         self._stop    = 0.0
         self.timeout = self._get_timeout_seconds(timeout)
 
@@ -147,7 +147,7 @@ class Timeout:
         return max(stop-time.time(), 0)
 
     @timeout.setter
-    def timeout(self, value: TimeoutValue):
+    def timeout(self, value: TimeoutValue) -> None:
         assert not self._stop
         self._timeout = self._get_timeout_seconds(value)
         self.timeout_change()
