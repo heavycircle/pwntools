@@ -65,7 +65,10 @@ You can also use ``Ret2dlresolve`` on AMD64:
     True
 """
 
+from __future__ import annotations
+
 from copy import deepcopy
+from typing import TYPE_CHECKING, TypeAlias
 
 from pwnlib.context import context
 from pwnlib.log import getLogger
@@ -73,13 +76,22 @@ from pwnlib.util.packing import *
 from pwnlib.util.packing import _need_bytes
 from pwnlib.util.misc import align
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from pwnlib.elf.elf import ELF
+
+
+# Recursive types for nested argument lists.
+Ret2dlresolveArg: TypeAlias = "str | bytes | int | list[Ret2dlresolveArg] | tuple[Ret2dlresolveArg, ...]"
+_PackedArg: TypeAlias = "bytes | int | list[_PackedArg]"
+
 log = getLogger(__name__)
 
 ELF32_R_SYM_SHIFT = 8
 ELF64_R_SYM_SHIFT = 32
 
 class Elf32_Rel:
-    ''
     """
     .. code-block:: c
 
@@ -88,20 +100,19 @@ class Elf32_Rel:
             Elf32_Word	r_info;
         } Elf32_Rel;
     """
-    size=1 # see _build_structures method for explanation
-    def __init__(self, r_offset=0, r_info=0):
+    size = 1 # see _build_structures method for explanation
+    def __init__(self, r_offset: int = 0, r_info: int = 0) -> None:
         self.r_offset = r_offset
         self.r_info = r_info
 
-    def __flat__(self):
+    def __flat__(self) -> bytes:
         return p32(self.r_offset) + p32(self.r_info)
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return self.__flat__()
 
 
 class Elf64_Rel:
-    ''
     """
     .. code-block:: c
 
@@ -111,19 +122,18 @@ class Elf64_Rel:
         } Elf64_Rel;
     """
     size=24
-    def __init__(self, r_offset=0, r_info=0):
+    def __init__(self, r_offset: int = 0, r_info: int = 0) -> None:
         self.r_offset = r_offset
         self.r_info = r_info
 
-    def __flat__(self):
+    def __flat__(self) -> bytes:
         return p64(self.r_offset) + p64(self.r_info) + p64(0)
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return self.__flat__()
 
 
 class Elf32_Sym:
-    ''
     """
     .. code-block:: c
 
@@ -137,7 +147,8 @@ class Elf32_Sym:
         } Elf32_Sym;
     """
     size = 16
-    def __init__(self, st_name=0, st_value=0, st_size=0, st_info=0, st_other=0, st_shndx=0):
+    def __init__(self, st_name: int = 0, st_value: int = 0, st_size: int = 0,
+                 st_info: int = 0, st_other: int = 0, st_shndx: int = 0) -> None:
         self.st_name = st_name
         self.st_value = st_value
         self.st_size = st_size
@@ -145,7 +156,7 @@ class Elf32_Sym:
         self.st_other = st_other
         self.st_shndx = st_shndx
 
-    def __flat__(self):
+    def __flat__(self) -> bytes:
         return p32(self.st_name) + \
             p32(self.st_value) + \
             p32(self.st_size) + \
@@ -153,12 +164,11 @@ class Elf32_Sym:
             p8(self.st_other) + \
             p16(self.st_shndx)
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return self.__flat__()
 
 
 class Elf64_Sym:
-    ''
     """
     .. code-block:: c
 
@@ -171,8 +181,9 @@ class Elf64_Sym:
             Elf64_Xword st_size;
         } Elf64_Sym;
     """
-    size=24
-    def __init__(self, st_name=0, st_value=0, st_size=0, st_info=0, st_other=0, st_shndx=0):
+    size = 24
+    def __init__(self, st_name: int = 0, st_value: int = 0, st_size: int = 0,
+                 st_info: int = 0, st_other: int = 0, st_shndx: int = 0) -> None:
         self.st_name = st_name
         self.st_value = st_value
         self.st_size = st_size
@@ -180,7 +191,7 @@ class Elf64_Sym:
         self.st_other = st_other
         self.st_shndx = st_shndx
 
-    def __flat__(self):
+    def __flat__(self) -> bytes:
         return p32(self.st_name) + \
             p8(self.st_info) + \
             p8(self.st_other) + \
@@ -188,13 +199,12 @@ class Elf64_Sym:
             p64(self.st_value) + \
             p64(self.st_size)
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return self.__flat__()
 
 
 class Queue(list):
-    ''
-    def size(self):
+    def size(self) -> int:
         size = 0
         for v in self:
             # Lists, strings and ints all have size context.size
@@ -207,7 +217,6 @@ class Queue(list):
 
 
 class MarkedBytes(bytes):
-    ''
     pass
 
 
@@ -235,7 +244,7 @@ class Ret2dlresolvePayload:
         callable function (do not set it when passing the object to 
         rop.ret2dlresolve).
     """
-    def __init__(self, elf, symbol, args, data_addr=None, resolution_addr=None):
+    def __init__(self, elf: ELF, symbol: str, args: Sequence[Ret2dlresolveArg], data_addr: int | None = None, resolution_addr: int | None = None) -> None:
         self.elf = elf
         self.elf_load_address_fixup = self.elf.address - self.elf.load_addr
         self.strtab = elf.dynamic_value_by_tag("DT_STRTAB") + self.elf_load_address_fixup
@@ -260,27 +269,25 @@ class Ret2dlresolvePayload:
 
         self._build()
 
-    def _format_args(self):
+    def _format_args(self) -> list[_PackedArg]:
         # Encode every string in args
-        def aux(args):
-            for i, arg in enumerate(args):
-                if isinstance(arg, (str,bytes)):
-                    args[i] = _need_bytes(args[i], min_wrong=0x80) + b"\x00"
-                elif isinstance(arg, (list, tuple)):
-                    aux(arg)
+        def aux(arg: Ret2dlresolveArg) -> _PackedArg:
+            if isinstance(arg, (str,bytes)):
+                return _need_bytes(arg, min_wrong=0x80) + b"\x00"
+            if isinstance(arg, (list, tuple)):
+                return [aux(a) for a in arg]
+            return arg
 
-        args = deepcopy(self.args)
-        aux(args)
-        return args
+        return [aux(arg) for arg in self.args]
 
-    def _get_recommended_address(self):
+    def _get_recommended_address(self) -> int:
         bss = self.elf.get_section_by_name(".bss").header.sh_addr + self.elf_load_address_fixup
         bss_size = self.elf.get_section_by_name(".bss").header.sh_size
         addr = bss + bss_size
         addr = addr + (-addr & 0xfff) - 0x200 #next page in memory - 0x200
         return addr
 
-    def _build_structures(self):
+    def _build_structures(self) -> None:
         # The first part of the payload is the usual of ret2dlresolve.
         if context.bits == 32:
             ElfSym = Elf32_Sym
@@ -346,7 +353,7 @@ class Ret2dlresolvePayload:
                      "try a different technique.", ver_addr)
             self.unreliable = True
 
-    def _build_args(self):
+    def _build_args(self) -> None:
         # The second part of the payload will include strings and pointers needed for ROP.
         queue = Queue()
 
@@ -382,6 +389,6 @@ class Ret2dlresolvePayload:
             self.payload += top
             queue.pop(0)
 
-    def _build(self):
+    def _build(self) -> None:
         self._build_structures()
         self._build_args()
