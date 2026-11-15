@@ -44,6 +44,10 @@ An ELF can also be created from in-memory bytes.
 Module Members
 --------------
 """
+
+from __future__ import annotations
+
+import builtins
 import collections
 import gzip
 import mmap
@@ -51,6 +55,7 @@ import os
 import re
 import subprocess
 import tempfile
+from typing import IO, TYPE_CHECKING, Any, TypeVar, cast
 
 from io import BytesIO
 
@@ -88,9 +93,12 @@ from pwnlib.util.fiddling import unhex
 from pwnlib.util.misc import align, align_down, which
 from pwnlib.util.sh_string import sh_string
 
+if TYPE_CHECKING:
+    from pwnlib.internal.typing import StrOrBytesPath
+
 log = getLogger(__name__)
 
-__all__ = ['load', 'ELF']
+__all__ = ['ELF', 'load']
 
 def _iter_symbols(sec):
     # Cache result of iter_symbols.
@@ -107,7 +115,7 @@ class Function:
         size(int): Size of the function, in bytes
         elf(ELF): Encapsulating ELF object
     """
-    def __init__(self, name, address, size, elf=None):
+    def __init__(self, name: str, address: int, size: int, elf: ELF | None = None) -> None:
         #: Name of the function
         self.name = name
 
@@ -120,7 +128,7 @@ class Function:
         #: Encapsulating ELF object
         self.elf = elf
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '%s(name=%r, address=%#x, size=%#x, elf=%r)' % (
             self.__class__.__name__,
             self.name,
@@ -129,7 +137,7 @@ class Function:
             self.elf
             )
 
-    def __flat__(self):
+    def __flat__(self) -> bytes:
         return packing.pack(self.address)
 
     def disasm(self):
@@ -139,7 +147,9 @@ def load(*args, **kwargs):
     """Compatibility wrapper for pwntools v1"""
     return ELF(*args, **kwargs)
 
-class dotdict(dict):
+_V = TypeVar("_V")
+
+class dotdict(dict[str, _V]):
     """Wrapper to allow dotted access to dictionary elements.
 
     Is a real :class:`dict` object, but also serves up keys as attributes
@@ -159,13 +169,17 @@ class dotdict(dict):
         >>> x.bar.baz
         4
     """
-    def __missing__(self, name):
+    # Widen __getitem__ for derivative classes.
+    if TYPE_CHECKING:
+        def __getitem__(self, key: str | bytes | bytearray) -> _V: ...
+
+    def __missing__(self, name: str | bytes | bytearray) -> _V:
         if isinstance(name, (bytes, bytearray)):
             name = packing._decode(name)
             return self[name]
         raise KeyError(name)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         if name in self:
             return self[name]
 
@@ -183,21 +197,21 @@ class dotdict(dict):
 # property that does the work instead.
 _libc_start_main_ret_aliases = ('__libc_start_main_ret', '__libc_start_main_return')
 
-class symboldict(dotdict):
+class symboldict(dotdict[int]):
     """dotdict used for :attr:`.ELF.symbols`.
 
     Behaves like a normal :class:`dotdict` but gives a helpful error when
     someone looks up ``__libc_start_main_ret``, which isn't a real symbol in
     libc. See https://github.com/Gallopsled/pwntools/issues/2563.
     """
-    def __missing__(self, name):
+    def __missing__(self, name: str | bytes | bytearray) -> int:
         if name in _libc_start_main_ret_aliases:
             raise KeyError(
                 '%r is not a symbol in the ELF. Use the ELF.libc_start_main_return '
                 'property to get the return address into __libc_start_main from main.' % name)
         return super().__missing__(name)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         if name in _libc_start_main_ret_aliases and name not in self:
             raise AttributeError(
                 '%r is not a symbol in the ELF. Use the ELF.libc_start_main_return '
@@ -228,25 +242,26 @@ class ELF(ELFFile):
     bits = 32
     bytes = 4
     path = '/path/to/the/file'
-    symbols = {}
-    got = {}
-    plt = {}
-    functions = {}
+    symbols: symboldict = symboldict()
+    got: dotdict[int] = dotdict()
+    plt: dotdict[int] = dotdict()
+    functions: dotdict[Function] = dotdict()
     endian = 'little'
     address = 0x400000
-    linker = None
+    linker: builtins.bytes | None = None
 
     # Whether to fill gaps in memory with zeroed pages
     _fill_gaps = True
 
 
-    def __init__(self, path_or_bytes, checksec=True):
+    def __init__(self, path_or_bytes: StrOrBytesPath, checksec: bool = True) -> None:
         # elftools uses the backing file for all reads and writes
         # in order to permit writing without being able to write to disk,
         # mmap() the file.
 
         if isinstance(path_or_bytes, (bytes, bytearray)) and path_or_bytes.startswith(b'\x7FELF'):
-            self.file = self.mmap = mmap.mmap(-1, len(path_or_bytes))
+            self.mmap = mmap.mmap(-1, len(path_or_bytes))
+            self.file: IO[bytes] | mmap.mmap = self.mmap
             self.mmap.write(path_or_bytes)
             path = "<bytes>"
         else:
@@ -256,7 +271,7 @@ class ELF(ELFFile):
             self.mmap = mmap.mmap(self.file.fileno(), 0, access=mmap.ACCESS_COPY)
             path = path_or_bytes
 
-        super(ELF,self).__init__(self.mmap)
+        super().__init__(cast('IO[bytes]', self.mmap))
 
         #: :class:`str`: Path to the file
         self.path = packing._need_text(os.path.abspath(path))
